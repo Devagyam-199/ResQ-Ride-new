@@ -10,7 +10,7 @@ import apiError from "../Utils/apiError.utils.js";
 
 const uploadToCloudinary = async (fileBuffer, options = {}) => {
   try {
-    if (!fileBuffer || !Buffer.isBuffer(filebuffer)) {
+    if (!fileBuffer || !Buffer.isBuffer(fileBuffer)) {
       throw new apiError(400, "No valid file buffer provided");
     }
 
@@ -46,3 +46,5 @@ const uploadToCloudinary = async (fileBuffer, options = {}) => {
     );
   }
 };
+
+export default uploadToCloudinary;

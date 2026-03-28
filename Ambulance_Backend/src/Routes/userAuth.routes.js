@@ -4,7 +4,7 @@ import jwtVerify from "../Middlewares/jwtVerifier.middlewares.js"
 
 const authRoute = Router()
 
-authRoute.post("/verify", verifyTokenController)   // public
-authRoute.get("/user",    jwtVerify, getMe)        // protected
+authRoute.post("/verify", verifyTokenController)
+authRoute.get("/user",    jwtVerify, getMe)
 
 export default authRoute
