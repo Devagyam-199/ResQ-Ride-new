@@ -16,6 +16,9 @@ app.use(express.json());
 import authRoute from "./Routes/userAuth.routes.js";
 app.use("/api/v1/auth", authRoute);
 
+import driverAuthRoute from "./Routes/driverAuth.routes.js"
+app.use("/api/v1/driver", driverAuthRoute) 
+
 /************************** last line of code **************************/
 
 app.use(globalError);

@@ -17,21 +17,50 @@ export const verifyTokenController = async (req, res) => {
 
     const phone = `+${mobile}`;
 
-    let user = await User.findOne({ phoneNumber: phone });
-    if (!user) {
-      user = await User.create({
-        phoneNumber: phone,
-        role: "User",
-      });
+    const existingDriver = await Driver.findOne({ phoneNumber: phone });
+    if (existingDriver) {
+      if (existingDriver.accStatus === "Pending")
+        return res
+          .status(403)
+          .json({
+            success: false,
+            error: "Your account is pending admin approval.",
+          });
+      if (existingDriver.accStatus === "Rejected")
+        return res
+          .status(403)
+          .json({ success: false, error: "Your registration was rejected." });
+      if (existingDriver.accStatus === "Suspended")
+        return res
+          .status(403)
+          .json({ success: false, error: "Your account has been suspended." });
+      const jwtToken = jwtGen(
+        existingDriver._id,
+        existingDriver.phoneNumber,
+        "Driver",
+      );
+      return res
+        .status(200)
+        .json({
+          success: true,
+          message: "Authenticated successfully",
+          data: {
+            accessToken: jwtToken,
+            user: { ...existingDriver.toObject(), role: "Driver" },
+          },
+        });
     }
 
+    let user = await User.findOne({ phoneNumber: phone });
+    if (!user) user = await User.create({ phoneNumber: phone, role: "User" });
     const jwtToken = jwtGen(user._id, user.phoneNumber, user.role);
-
-    return res.status(200).json({
-      success: true,
-      message: "Authenticated successfully",
-      data: { accessToken: jwtToken, user },
-    });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Authenticated successfully",
+        data: { accessToken: jwtToken, user },
+      });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

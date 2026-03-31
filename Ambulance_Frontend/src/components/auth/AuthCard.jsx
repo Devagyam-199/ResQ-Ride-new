@@ -20,7 +20,6 @@ const AuthCard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ NEW: Controlled tab state – "SignUp" is active by default
   const [activeTab, setActiveTab] = useState("SignUp");
 
   const { sdkReady, sdkError, sendOtp, verifyOtp } = useMsg91();
@@ -103,7 +102,7 @@ const AuthCard = () => {
         className={`text-white flex justify-center w-full lg:text-base md:text-sm text-xs`}
       >
         <p>
-          <Link to={"/driver"} className="text-[#0077B6] hover:text-[#00B4D8]">
+          <Link to={"/driver/register"} className="text-[#0077B6] hover:text-[#00B4D8]">
             Join
           </Link>{" "}
           our network of emergency responders.
