@@ -237,9 +237,6 @@ export default function DriverRegisterPage() {
     }
   };
 
-  /* ─────────────────────────────────── */
-  /* render                              */
-  /* ─────────────────────────────────── */
   return (
     <div className="relative min-h-screen w-full overflow-hidden text-slate-300 flex items-center justify-center">
       {/* background */}

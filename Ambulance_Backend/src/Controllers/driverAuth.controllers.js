@@ -48,6 +48,7 @@ const driverRegister = async (req, res) => {
       vehicleType,
       email:       email || undefined,
       accStatus:   "Pending",
+      
       driverPhoto: photoResult,
       documents: [{
         type:       "Driver's License",

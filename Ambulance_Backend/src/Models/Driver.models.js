@@ -69,7 +69,7 @@ const driverSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       sparse: true,
-      lowercase:true,
+      lowercase: true,
     },
     password: {
       type: String,
@@ -89,7 +89,7 @@ const driverSchema = new mongoose.Schema(
     currentBooking: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Booking",
-      default:null,
+      default: null,
     },
     driverPhoto: {
       type: driverPhotoSchema,
@@ -103,8 +103,15 @@ const driverSchema = new mongoose.Schema(
     },
 
     location: {
-      type: { type: String, default: "Point" },
-      coordinates: [Number],
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number],
+        default: [0, 0],
+      },
     },
     isAvailable: {
       type: Boolean,
@@ -118,7 +125,6 @@ const driverSchema = new mongoose.Schema(
   { timestamps: true },
 );
 driverSchema.index({ location: "2dsphere" });
-driverSchema.index({ phoneNumber: 1 });
 driverSchema.index({ accStatus: 1 });
 const Driver = mongoose.model("Driver", driverSchema);
 export default Driver;
