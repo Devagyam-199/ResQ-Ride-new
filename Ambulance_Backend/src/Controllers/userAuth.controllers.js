@@ -1,6 +1,7 @@
 import verifyToken from "../services/msg91.services.js";
 import User from "../Models/Users.models.js";
 import jwtGen from "../Utils/jwtGenerator.utils.js";
+import Driver from "../Models/Driver.models.js"
 
 export const verifyTokenController = async (req, res) => {
   const { accessToken, role = "User" } = req.body;
