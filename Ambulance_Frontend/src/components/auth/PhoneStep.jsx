@@ -25,9 +25,7 @@ const PhoneStep = ({ phone, setPhone, onSubmit, loading, disabled }) => {
   return (
     <>
       <div className="space-y-4 lg:text-base md:text-sm text-xs ">
-        <label className="text-slate-200 font-medium ">
-          Phone Number:
-        </label>
+        <label className="text-slate-200 font-medium ">Phone Number:</label>
 
         {/* Input row */}
         <div className="flex items-center border-b-2 border-b-[#00B4D8] pb-1 gap-2">
@@ -74,7 +72,8 @@ const PhoneStep = ({ phone, setPhone, onSubmit, loading, disabled }) => {
         <Button
           onClick={handleSubmit}
           disabled={loading || disabled || displayDigits.length !== 10}
-          className="w-full h-12 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-200"
+          variant="default"
+          className={"h-12"}
         >
           {loading ? "Sending..." : disabled ? "Loading SDK..." : "Send OTP"}
         </Button>

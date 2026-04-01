@@ -15,7 +15,7 @@ const STEPS = ["Details", "Documents", "Phone", "Verify", "Done"];
 
 /* ─── small helpers ─── */
 const StepIndicator = ({ current }) => (
-  <div className="flex items-center justify-center gap-2 mb-6">
+  <div className="flex items-center justify-center  gap-2 mb-6">
     {STEPS.map((label, i) => {
       const done = i < current;
       const active = i === current;
@@ -28,12 +28,16 @@ const StepIndicator = ({ current }) => (
             >
               {done ? "✓" : i + 1}
             </div>
-            <span className={`text-[10px] hidden sm:block transition-colors ${active ? "text-[#00B4D8]" : done ? "text-slate-400" : "text-slate-600"}`}>
+            <span
+              className={`text-[10px] hidden sm:block transition-colors ${active ? "text-[#00B4D8]" : done ? "text-slate-400" : "text-slate-600"}`}
+            >
               {label}
             </span>
           </div>
           {i < STEPS.length - 1 && (
-            <div className={`w-6 sm:w-10 h-px mb-4 transition-all duration-300 ${done ? "bg-[#00B4D8]" : "bg-slate-700"}`} />
+            <div
+              className={`w-4 sm:w-10 h-0.5 sm:mb-4 transition-all duration-300 ${done ? "bg-[#00B4D8]" : "bg-slate-700"}`}
+            />
           )}
         </div>
       );
@@ -63,10 +67,17 @@ const FieldInput = ({ error, ...props }) => (
 const FileUploadBox = ({ label, hint, accept, file, onChange, error }) => (
   <div>
     <FieldLabel required>{label}</FieldLabel>
-    <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg
+    <label
+      className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg
       py-6 px-4 cursor-pointer transition-all duration-200
-      ${error ? "border-red-500/50 bg-red-900/10" : file ? "border-[#00B4D8]/60 bg-[#0077B6]/10" : "border-slate-700 hover:border-slate-500 bg-slate-800/40"}`}>
-      <input type="file" accept={accept} className="hidden" onChange={onChange} />
+      ${error ? "border-red-500/50 bg-red-900/10" : file ? "border-[#00B4D8]/60 bg-[#0077B6]/10" : "border-slate-700 hover:border-slate-500 bg-slate-800/40"}`}
+    >
+      <input
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={onChange}
+      />
       {file ? (
         <>
           <div className="w-8 h-8 rounded-full bg-[#0077B6]/30 flex items-center justify-center">
@@ -133,7 +144,10 @@ export default function DriverRegisterPage() {
     setResendTimer(15);
     const id = setInterval(() => {
       setResendTimer((t) => {
-        if (t <= 1) { clearInterval(id); return 0; }
+        if (t <= 1) {
+          clearInterval(id);
+          return 0;
+        }
         return t - 1;
       });
     }, 1000);
@@ -142,7 +156,8 @@ export default function DriverRegisterPage() {
   const validateDetails = () => {
     const e = {};
     if (!form.name.trim()) e.name = "Name is required";
-    if (!form.vehicleNumber.trim()) e.vehicleNumber = "Vehicle number is required";
+    if (!form.vehicleNumber.trim())
+      e.vehicleNumber = "Vehicle number is required";
     if (!form.vehicleType) e.vehicleType = "Vehicle type is required";
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = "Enter a valid email address";
@@ -221,7 +236,7 @@ export default function DriverRegisterPage() {
       await axios.post(
         `${import.meta.env.VITE_API_URL}/api/v1/driver/register`,
         fd,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
 
       setAccessToken(token);
@@ -229,8 +244,8 @@ export default function DriverRegisterPage() {
     } catch (err) {
       setGlobalError(
         err.response?.data?.error ||
-        err.message ||
-        "Verification failed. Please try again."
+          err.message ||
+          "Verification failed. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -251,41 +266,76 @@ export default function DriverRegisterPage() {
 
       {/* content */}
       <div className="relative z-10 w-full flex flex-col items-center justify-center px-4 py-8">
-
         {/* header — same as AuthenticationPage */}
         <div className="flex items-center gap-4 w-full justify-center mb-6">
-          <svg className="w-1/4 md:w-1/6" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            className="w-1/3 md:w-1/4"
+            viewBox="0 0 400 200"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <defs>
-              <linearGradient id="ecgL" x1="0" y1="0" x2="190" y2="0" gradientUnits="userSpaceOnUse">
+              <linearGradient
+                id="ecgL"
+                x1="0"
+                y1="0"
+                x2="190"
+                y2="0"
+                gradientUnits="userSpaceOnUse"
+              >
                 <stop offset="0%" stopColor="#0077b6" stopOpacity="0" />
                 <stop offset="100%" stopColor="#0077b6" stopOpacity="1" />
               </linearGradient>
             </defs>
-            <path d="M10,100L50,100L65,65L75,135L85,100L125,100L140,25L155,175L170,100L210,100L225,80L235,120L245,100L290,100L305,45L325,155L340,100L380,100"
-              fill="none" stroke="url(#ecgL)" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round" />
+            <path
+              d="M10,100L50,100L65,65L75,135L85,100L125,100L140,25L155,175L170,100L210,100L225,80L235,120L245,100L290,100L305,45L325,155L340,100L380,100"
+              fill="none"
+              stroke="url(#ecgL)"
+              strokeWidth="5"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
           </svg>
 
-          <p className="text-2xl sm:text-4xl md:text-5xl text-slate-100 font-light tracking-wide">
+          <p className="text-xl sm:text-4xl md:text-5xl lg:text-6xl text-slate-100 font-light tracking-wide">
             ResQRide
           </p>
 
-          <svg className="w-1/4 md:w-1/6" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            className="w-1/3 md:w-1/4"
+            viewBox="0 0 400 200"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <defs>
-              <linearGradient id="ecgR" x1="210" y1="0" x2="400" y2="0" gradientUnits="userSpaceOnUse">
+              <linearGradient
+                id="ecgR"
+                x1="210"
+                y1="0"
+                x2="400"
+                y2="0"
+                gradientUnits="userSpaceOnUse"
+              >
                 <stop offset="0%" stopColor="#0077b6" stopOpacity="1" />
                 <stop offset="100%" stopColor="#0077b6" stopOpacity="0" />
               </linearGradient>
             </defs>
-            <path d="M10,100L50,100L65,65L75,135L85,100L125,100L140,25L155,175L170,100L210,100L225,80L235,120L245,100L290,100L305,45L325,155L340,100L380,100"
-              fill="none" stroke="url(#ecgR)" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round" />
+            <path
+              d="M10,100L50,100L65,65L75,135L85,100L125,100L140,25L155,175L170,100L210,100L225,80L235,120L245,100L290,100L305,45L325,155L340,100L380,100"
+              fill="none"
+              stroke="url(#ecgR)"
+              strokeWidth="5"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
           </svg>
         </div>
 
         {/* card */}
         <Card className="w-full max-w-md bg-slate-950/75 backdrop-blur-md text-slate-200 border-slate-800">
           <CardHeader className="pb-0 pt-6 px-6">
-            <p className="text-center text-lg md:text-xl font-medium text-slate-100">
-              {step === 4 ? "Registration Submitted" : "Join as Emergency Responder"}
+            <p className="text-center lg:text-2xl md:text-xl text-base font-medium text-slate-100">
+              {step === 4
+                ? "Registration Submitted"
+                : "Join as Emergency Responder"}
             </p>
             {step < 4 && (
               <p className="text-center text-xs text-slate-500 mt-1">
@@ -295,15 +345,10 @@ export default function DriverRegisterPage() {
           </CardHeader>
 
           <CardContent className="px-6 pb-6 pt-4">
-            <StepIndicator current={step} />
+            <div className="w-full flex justify-center items-center">
+              <StepIndicator current={step} />
+            </div>
 
-            {globalError && (
-              <div className="mb-4 px-3 py-2 rounded-lg bg-red-900/30 border border-red-700/40 text-red-400 text-sm">
-                {globalError}
-              </div>
-            )}
-
-            {/* ── STEP 0: Details ── */}
             {step === 0 && (
               <div className="space-y-4">
                 <div>
@@ -343,7 +388,9 @@ export default function DriverRegisterPage() {
                     <option value="Mortuary">Mortuary</option>
                   </select>
                   {formErrors.vehicleType && (
-                    <p className="text-red-400 text-xs mt-1">{formErrors.vehicleType}</p>
+                    <p className="text-red-400 text-xs mt-1">
+                      {formErrors.vehicleType}
+                    </p>
                   )}
                 </div>
 
@@ -398,7 +445,7 @@ export default function DriverRegisterPage() {
                   <Button
                     variant="ghost"
                     onClick={() => setStep(0)}
-                    className="flex-1 h-11 text-slate-400 hover:text-slate-200 border border-slate-700"
+                    className="flex-1 h-11 text-slate-400 hover:text-slate-900 border border-slate-700"
                   >
                     ← Back
                   </Button>
@@ -431,7 +478,9 @@ export default function DriverRegisterPage() {
                       inputMode="numeric"
                       value={digits}
                       onChange={(e) => {
-                        const d = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        const d = e.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, 10);
                         setPhone("+91" + d);
                         if (phoneError) setPhoneError("");
                       }}
@@ -441,20 +490,24 @@ export default function DriverRegisterPage() {
                         placeholder-slate-500 font-medium tracking-widest caret-blue-400"
                     />
                     {digits.length > 0 && (
-                      <span className={`text-xs font-mono shrink-0 transition-colors
-                        ${digits.length === 10 ? "text-emerald-400" : "text-slate-500"}`}>
+                      <span
+                        className={`text-xs font-mono shrink-0 transition-colors
+                        ${digits.length === 10 ? "text-emerald-400" : "text-slate-500"}`}
+                      >
                         {digits.length}/10
                       </span>
                     )}
                   </div>
-                  {phoneError && <p className="text-red-400 text-xs mt-1">{phoneError}</p>}
+                  {phoneError && (
+                    <p className="text-red-400 text-xs mt-1">{phoneError}</p>
+                  )}
                 </div>
 
                 <div className="flex gap-3 mt-2">
                   <Button
                     variant="ghost"
                     onClick={() => setStep(1)}
-                    className="flex-1 h-11 text-slate-400 hover:text-slate-200 border border-slate-700"
+                    className="flex-1 h-11 text-slate-400 hover:text-slate-900 border border-slate-700"
                   >
                     ← Back
                   </Button>
@@ -463,7 +516,11 @@ export default function DriverRegisterPage() {
                     disabled={loading || !sdkReady || digits.length !== 10}
                     className="flex-1 h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100"
                   >
-                    {loading ? "Sending..." : !sdkReady ? "Loading..." : "Send OTP"}
+                    {loading
+                      ? "Sending..."
+                      : !sdkReady
+                        ? "Loading..."
+                        : "Send OTP"}
                   </Button>
                 </div>
               </div>
@@ -478,7 +535,11 @@ export default function DriverRegisterPage() {
                 </p>
 
                 <div className="flex justify-center">
-                  <InputOTP maxLength={6} onComplete={handleVerifyAndSubmit} disabled={loading}>
+                  <InputOTP
+                    maxLength={6}
+                    onComplete={handleVerifyAndSubmit}
+                    disabled={loading}
+                  >
                     <InputOTPGroup>
                       {[0, 1, 2, 3, 4, 5].map((i) => (
                         <InputOTPSlot key={i} index={i} />
@@ -502,8 +563,8 @@ export default function DriverRegisterPage() {
                   {resendCount >= 2
                     ? "Resend limit reached"
                     : resendTimer > 0
-                    ? `Resend in ${resendTimer}s`
-                    : `Resend OTP (${2 - resendCount} left)`}
+                      ? `Resend in ${resendTimer}s`
+                      : `Resend OTP (${2 - resendCount} left)`}
                 </Button>
 
                 <Button
@@ -519,8 +580,10 @@ export default function DriverRegisterPage() {
             {/* ── STEP 4: Success ── */}
             {step === 4 && (
               <div className="flex flex-col items-center gap-5 py-2">
-                <div className="w-16 h-16 rounded-full bg-[#0077B6]/20 border-2 border-[#00B4D8]/50
-                  flex items-center justify-center">
+                <div
+                  className="w-16 h-16 rounded-full bg-[#0077B6]/20 border-2 border-[#00B4D8]/50
+                  flex items-center justify-center"
+                >
                   <span className="text-3xl">✓</span>
                 </div>
 
@@ -536,15 +599,20 @@ export default function DriverRegisterPage() {
                 </div>
 
                 <div className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 space-y-1.5">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Submitted details</p>
-                  <p className="text-sm text-slate-300">
-                    <span className="text-slate-500">Name: </span>{form.name}
+                  <p className="text-xs text-slate-500 uppercase tracking-wider">
+                    Submitted details
                   </p>
                   <p className="text-sm text-slate-300">
-                    <span className="text-slate-500">Vehicle: </span>{form.vehicleNumber.toUpperCase()} · {form.vehicleType}
+                    <span className="text-slate-500">Name: </span>
+                    {form.name}
                   </p>
                   <p className="text-sm text-slate-300">
-                    <span className="text-slate-500">Phone: </span>{phone}
+                    <span className="text-slate-500">Vehicle: </span>
+                    {form.vehicleNumber.toUpperCase()} · {form.vehicleType}
+                  </p>
+                  <p className="text-sm text-slate-300">
+                    <span className="text-slate-500">Phone: </span>
+                    {phone}
                   </p>
                 </div>
 
@@ -562,10 +630,10 @@ export default function DriverRegisterPage() {
               <>
                 <div className="flex items-center my-4">
                   <div className="flex-1 border-t border-slate-700" />
-                  <span className="text-slate-500 mx-4 text-xs">or</span>
+                  <span className="text-slate-500 mx-4 lg:text-base md:text-sm text-xs">or</span>
                   <div className="flex-1 border-t border-slate-700" />
                 </div>
-                <p className="text-center text-xs text-slate-400">
+                <p className="text-center lg:text-base md:text-sm text-xs text-slate-400">
                   Already approved?{" "}
                   <Link to="/" className="text-[#0077B6] hover:text-[#00B4D8]">
                     Log in here
