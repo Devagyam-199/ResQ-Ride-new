@@ -2,16 +2,20 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    role:{
-      type:String,
-      enum:["Admin","Driver","User"],
+    role: {
+      type: String,
+      enum: ["Admin", "Driver", "User"],
     },
     phoneNumber: {
       type: String,
       required: true,
       unique: true,
     },
-    name: {
+    userName: {
+      type: String,
+      unique: true,
+    },
+    displayname: {
       type: String,
     },
     trustScore: {
@@ -27,8 +31,8 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    lastLoginAt:{
-      type:Date,
+    lastLoginAt: {
+      type: Date,
     },
   },
   { timestamps: true },

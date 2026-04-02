@@ -10,17 +10,13 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const AuthCard = () => {
   const [step, setStep] = useState("phone");
   const [phone, setPhone] = useState("+91");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const [activeTab, setActiveTab] = useState("SignUp");
 
   const { sdkReady, sdkError, sendOtp, verifyOtp } = useMsg91();
   const { loginWithToken } = useAuth();
