@@ -2,22 +2,7 @@ import verifyToken from "../services/msg91.services.js";
 import User from "../Models/Users.models.js";
 import jwtGen from "../Utils/jwtGenerator.utils.js";
 import Driver from "../Models/Driver.models.js";
-
-const userNameGenerator = async () => {
-  let username;
-  let notUnique = true;
-  while (notUnique) {
-    const randomNumGen = Math.floor(1000 + Math.random() * 9000);
-    username = `user_${randomNumGen}`;
-
-    const user = await User.findOne({
-      userName: username,
-    });
-
-    if (!user) notUnique = false;
-  }
-  return username;
-};
+import userNameGenerator from "../utils/randomeUserNameGenerator.utils.js";
 
 export const verifyTokenController = async (req, res) => {
   const { accessToken, role = "User" } = req.body;

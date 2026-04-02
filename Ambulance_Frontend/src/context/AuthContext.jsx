@@ -4,8 +4,8 @@ import axios from "axios";
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [user, setUser]     = useState(null);
+  const [token, setToken]   = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loginWithToken = useCallback(async (accessToken) => {
@@ -24,23 +24,38 @@ export const AuthProvider = ({ children }) => {
     return userData;
   }, []);
 
-  // Auto-restore session on refresh
+  const restoreFromJwt = useCallback(async (jwt) => {
+    const res = await axios.get(
+      `${import.meta.env.VITE_API_URL}/api/v1/auth/user`,
+      { headers: { Authorization: `Bearer ${jwt}` } }
+    );
+
+    const userData = res.data.user;
+
+    setToken(jwt);
+    setUser(userData);
+    axios.defaults.headers.common["Authorization"] = `Bearer ${jwt}`;
+
+    return userData;
+  }, []);
+
   useEffect(() => {
     const restoreSession = async () => {
       const savedToken = localStorage.getItem("accessToken");
       if (savedToken) {
         try {
-          await loginWithToken(savedToken);
+          await restoreFromJwt(savedToken);
         } catch (err) {
-          console.error("Auto-login failed:", err);
+          console.error("Session restore failed:", err);
           localStorage.removeItem("accessToken");
+          delete axios.defaults.headers.common["Authorization"];
         }
       }
       setLoading(false);
     };
 
     restoreSession();
-  }, [loginWithToken]);   // ← added this
+  }, [restoreFromJwt]);
 
   const logout = useCallback(() => {
     setToken(null);

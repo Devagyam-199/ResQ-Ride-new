@@ -43,7 +43,7 @@ transition-transform duration-300"
             alt="Ambulance"
           />
           <p className="text-white font-medium">
-            Hello, {user.userName} 👋
+            Hello, {user?.displayName || user?.userName}
           </p>
         </div>
 
@@ -56,11 +56,24 @@ transition-transform duration-300"
 
       {/* Bottom Dashboard Panel */}
       <div
-        className="absolute h-1/3 bottom-0 mx-auto w-full sm:w-4/5
+        className="absolute h-1/3 bottom-0 mx-auto w-full sm:w-1/2
 bg-white z-1000 p-4 rounded-t-2xl shadow-lg 
-transition-transform duration-300"
+transition-transform duration-300 flex flex-col items-center"
       >
-        hello everyone this is the dashboard
+        <div className="space-y-5 p-3 w-full flex flex-col items-center">
+          <input
+            type="text"
+            className="w-5/6 bg-red-500"
+            placeholder="Enter Your Current Address"
+          />
+          <input
+            type="text"
+            name=""
+            id=""
+            className="w-5/6 bg-green-500"
+            placeholder="Search for hospitals?"
+          />
+        </div>
       </div>
     </div>
   );
