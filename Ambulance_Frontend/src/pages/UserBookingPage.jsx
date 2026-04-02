@@ -2,8 +2,11 @@ import React from "react";
 import Map from "@/components/ui/Map.jsx";
 import { Button } from "@/components/ui/button";
 import ambulanceimage from "@/assets/ambulance_authpage.png";
-
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useAuth from "@/context/AuthContext";
+import blsambulance from "@/assets/BLS_ambulance.png";
+import alsambulance from "@/assets/ALS_ambulance.png";
+import mortambulance from "@/assets/MORT_ambulance.png";
 
 const UserBookingPage = () => {
   const { user, loading } = useAuth();
@@ -56,23 +59,50 @@ transition-transform duration-300"
 
       {/* Bottom Dashboard Panel */}
       <div
-        className="absolute h-1/3 bottom-0 mx-auto w-full sm:w-1/2
-bg-white z-1000 p-4 rounded-t-2xl shadow-lg 
-transition-transform duration-300 flex flex-col items-center"
+        className="absolute bottom-0 mx-auto w-full sm:w-1/2
+bg-slate-950/70 backdrop-blur-md z-1000 p-4 rounded-t-2xl shadow-lg 
+transition-transform duration-300 flex flex-col items-center space-y-7"
       >
-        <div className="space-y-5 p-3 w-full flex flex-col items-center">
+        <div className="space-y-2 p-3 w-3/4 flex flex-col">
+          <label className="text-slate-200 font-medium ">Pickup Address:</label>
           <input
             type="text"
-            className="w-5/6 bg-red-500"
+            className="flex-1 bg-slate-800 outline-none pt-3 text-slate-100
+                        placeholder-slate-500 font-medium tracking-widest caret-blue-400 w-full rounded-xl border-2 px-5 py-2 border-slate-500"
             placeholder="Enter Your Current Address"
           />
+          <label className="text-slate-200 font-medium ">
+            Hospital Address:
+          </label>
           <input
             type="text"
             name=""
             id=""
-            className="w-5/6 bg-green-500"
+            className="flex-1 bg-slate-800 outline-none pt-3 text-slate-100
+                        placeholder-slate-500 font-medium tracking-widest caret-blue-400 w-full rounded-xl border-2 px-5 py-2 border-slate-500"
             placeholder="Search for hospitals?"
           />
+        </div>
+        <div className="flex justify-center w-full items-center">
+          <Tabs
+            defaultValue="overview"
+            className={`flex justify-between items-center w-full`}
+          >
+            <TabsList
+              variant="line"
+              className={`flex justify-between items-center w-full`}
+            >
+              <TabsTrigger value="basic ambulance">
+                <img src={blsambulance} alt="" srcset="" className="w-20" />
+              </TabsTrigger>
+              <TabsTrigger value="adavanced ambulance">
+                <img src={alsambulance} alt="" srcset="" className="w-20" />
+              </TabsTrigger>
+              <TabsTrigger value="mortuary ambulance">
+                <img src={mortambulance} alt="" srcset="" className="w-20" />
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </div>
     </div>
