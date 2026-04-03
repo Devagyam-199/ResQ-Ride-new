@@ -49,7 +49,8 @@ const Map = () => {
       <MapContainer
         center={userCords}
         touchZoom={true}
-        zoom={13}
+        zoom={14}
+        zoomControl={false}
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer

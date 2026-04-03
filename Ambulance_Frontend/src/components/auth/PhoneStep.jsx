@@ -73,7 +73,7 @@ const PhoneStep = ({ phone, setPhone, onSubmit, loading, disabled }) => {
           onClick={handleSubmit}
           disabled={loading || disabled || displayDigits.length !== 10}
           variant="default"
-          className={"h-12"}
+          className={"lg:h-12 h-10"}
         >
           {loading ? "Sending..." : disabled ? "Loading SDK..." : "Send OTP"}
         </Button>
