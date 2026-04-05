@@ -12,12 +12,16 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(cookieParser());
 
 import authRoute from "./Routes/userAuth.routes.js";
 app.use("/api/v1/auth", authRoute);
 
 import driverAuthRoute from "./Routes/driverAuth.routes.js";
 app.use("/api/v1/driver", driverAuthRoute);
+
+import bookingRoute from "./Routes/booking.routes.js"
+app.use("/api/v1/booking",bookingRoute);
 
 /************************** last line of code **************************/
 
