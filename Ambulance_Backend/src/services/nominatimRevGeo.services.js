@@ -1,4 +1,4 @@
-import axios from "axois";
+import axios from "axios";
 const nominatimHeaders = {
   "User-Agent": "ResQRide/1.0 (contact@resqride.in)",
 };
@@ -14,7 +14,7 @@ const reverseGeocode = async (lat, long) => {
     );
     return data.display_name ?? `${lat} , ${long}`;
   } catch {
-    return `${lat}, ${lng}`;
+    return `${lat}, ${long}`;
   }
 };
 

@@ -198,9 +198,9 @@ const initSocket = (server) => {
   return io;
 };
 
-const getIo = () => {
+const getIO = () => {
   if (!io) throw new Error("Socket.io not initialised — call initSocket first");
   return io;
 };
 
-export { initSocket, getIo };
+export { initSocket, getIO };

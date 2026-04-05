@@ -5,8 +5,8 @@ import {
   haverSineCalculator,
   fareCalculator
 } from "../Utils/fareCalculator.utils.js";
-import { reverseGeocode } from "../services/geocoding.services.js";
-import { getIO } from "../socket/socket.js";
+import { reverseGeocode } from "../services/nominatimRevGeo.services.js";
+import { getIO } from "../sockets/socket.js";
 
 const createBooking = async (req, res) => {
   try {
