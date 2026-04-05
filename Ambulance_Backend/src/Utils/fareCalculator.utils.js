@@ -13,21 +13,24 @@ const Rates = {
   },
 };
 
-const haverSineCalculator = (lat1, lat2, long1, long2) => {
-  const Radius = 6137;
-  const delLat = ((lat2 - lat1) * Math.PI) / 180;
-  const delLong = ((long2 - long1) * Math.PI) / 180;
+const haverSineCalculator = (lat1, lng1, lat2, lng2) => {
+  const R = 6371;
+
+  const toRad = (deg) => (deg * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
 
   const a =
-    Math.sin(delLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(delLong / 2) ** 2;
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
 
-  return Radius * 2 * Math.atan2(Math.sqrt(a) * Math.sqrt(a - 1));
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const fareCalculator = (distancekm, bookingType = "Basic") => {
-  const rate = Rates[bookingType] ?? Rates.basic;
-  return Math.round(rate.rates + distancekm * perKM);
+const fareCalculator = (distanceKm, bookingType = "Basic") => {
+  const rate = Rates[bookingType.toLowerCase()] ?? Rates.basic;
+  return Math.round(rate.rates + distanceKm * rate.perKM);
 };
 
 export { haverSineCalculator, fareCalculator };

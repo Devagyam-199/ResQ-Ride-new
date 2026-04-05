@@ -12,14 +12,37 @@ import alsambulance from "@/assets/ALS_ambulance.png";
 import mortambulance from "@/assets/MORT_ambulance.png";
 
 const AMBULANCE_TYPES = [
-  { value: "Basic", label: "Basic", img: blsambulance },
-  { value: "Advanced", label: "Advanced", img: alsambulance },
+  { value: "Basic",    label: "Basic",    img: blsambulance  },
+  { value: "Advanced", label: "Advanced", img: alsambulance  },
   { value: "Mortuary", label: "Mortuary", img: mortambulance },
 ];
 
 const STATUS_STEPS = ["Confirmed", "En-Route", "Arrived", "Completed"];
 
-/* ── tiny sub-components ────────────────────────────────── */
+const reverseGeocodeClient = async (lat, lng) => {
+  try {
+    const { data } = await axios.get(
+      "https://nominatim.openstreetmap.org/reverse",
+      {
+        params: { lat, lon: lng, format: "json", addressdetails: 1 },
+        headers: { "User-Agent": "ResQRide/1.0 (contact@resqride.in)" },
+      },
+    );
+    if (!data || data.error) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const a = data.address || {};
+    const parts = [
+      a.road || a.pedestrian || a.neighbourhood,
+      a.suburb || a.village || a.town,
+      a.city || a.county,
+    ].filter(Boolean);
+    return parts.length >= 2
+      ? parts.slice(0, 3).join(", ")
+      : data.display_name.split(",").slice(0, 3).join(", ");
+  } catch {
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
+};
+
 
 const AddressField = ({
   label,
@@ -29,6 +52,8 @@ const AddressField = ({
   results,
   loading,
   placeholder,
+  onDetectLocation,
+  detectingLocation,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -47,24 +72,39 @@ const AddressField = ({
       <label className="text-slate-300 text-xs font-medium mb-1 block">
         {label}
       </label>
-      <input
-        value={value}
-        onChange={handleChange}
-        onFocus={() => results.length && setOpen(true)}
-        placeholder={placeholder}
-        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5
-                   text-slate-100 text-sm placeholder-slate-500 outline-none
-                   focus:border-[#0077B6] focus:ring-2 focus:ring-[#0077B6]/30 transition-all"
-      />
+      <div className="flex gap-2">
+        <input
+          value={value}
+          onChange={handleChange}
+          onFocus={() => results.length && setOpen(true)}
+          placeholder={placeholder}
+          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5
+                     text-slate-100 text-sm placeholder-slate-500 outline-none
+                     focus:border-[#0077B6] focus:ring-2 focus:ring-[#0077B6]/30 transition-all"
+        />
+        {onDetectLocation && (
+          <button
+            type="button"
+            onClick={onDetectLocation}
+            disabled={detectingLocation}
+            title="Use my current location"
+            className="px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg
+                       text-slate-400 hover:text-[#00B4D8] hover:border-[#0077B6]
+                       transition-all disabled:opacity-50 text-sm shrink-0"
+          >
+            {detectingLocation ? "..." : "GPS"}
+          </button>
+        )}
+      </div>
       {loading && (
-        <span className="absolute right-3 top-8 text-xs text-slate-500">
-          searching…
+        <span className="absolute right-14 top-8 text-xs text-slate-500">
+          searching...
         </span>
       )}
       {open && results.length > 0 && (
         <ul
           className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700
-                       rounded-lg shadow-xl overflow-hidden"
+                     rounded-lg shadow-xl overflow-hidden"
         >
           {results.map((r, i) => (
             <li
@@ -88,11 +128,11 @@ const DriverCard = ({ driver }) => (
       <img
         src={driver.photo}
         className="w-14 h-14 rounded-full object-cover border-2 border-[#00B4D8]"
-        alt=""
+        alt="driver"
       />
     ) : (
       <div className="w-14 h-14 rounded-full bg-[#0077B6]/20 flex items-center justify-center text-2xl">
-        🚑
+        A
       </div>
     )}
     <div className="flex-1 min-w-0">
@@ -110,7 +150,7 @@ const StatusBar = ({ status }) => {
   return (
     <div className="flex items-center justify-between gap-1">
       {STATUS_STEPS.map((s, i) => {
-        const done = i < idx;
+        const done   = i < idx;
         const active = i === idx;
         return (
           <div key={s} className="flex-1 flex flex-col items-center gap-1">
@@ -131,34 +171,57 @@ const StatusBar = ({ status }) => {
   );
 };
 
-/* ── main page ────────────────────────────────────────────── */
 const UserBookingPage = () => {
   const { user, token, loading: authLoading } = useAuth();
   const { socket, connected, emit, on } = useSocket(token);
   const pickupGeo = useGeocoding();
-  const dropGeo = useGeocoding();
+  const dropGeo   = useGeocoding();
 
-  /* form state */
-  const [pickupText, setPickupText] = useState("");
-  const [dropText, setDropText] = useState("");
-  const [pickupCoords, setPickupCoords] = useState(null); // { lat, lng }
-  const [dropCoords, setDropCoords] = useState(null);
+  const [pickupText,   setPickupText]   = useState("");
+  const [dropText,     setDropText]     = useState("");
+  const [pickupCoords, setPickupCoords] = useState(null);
+  const [dropCoords,   setDropCoords]   = useState(null);
   const [ambulanceType, setAmbulanceType] = useState("Basic");
 
-  /* booking flow state */
+  const [detectingLocation, setDetectingLocation] = useState(false);
+
   const [bookingState, setBookingState] = useState("idle");
-  // idle | pending | confirmed | en_route | arrived | completed | cancelled
-  const [booking, setBooking] = useState(null);
-  const [driver, setDriver] = useState(null);
+  const [booking,      setBooking]      = useState(null);
+  const [driver,       setDriver]       = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
-  const [fare, setFare] = useState(null);
-  const [error, setError] = useState("");
+  const [fare,    setFare]    = useState(null);
+  const [error,   setError]   = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  /* watchPosition ref for driver location (driver page will use it; here just cleanup) */
-  const watchRef = useRef(null);
+  const detectPickupLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setDetectingLocation(true);
+    setError("");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        const label = await reverseGeocodeClient(lat, lng);
+        setPickupText(label);
+        setPickupCoords({ lat, lng });
+        pickupGeo.clear();
+        setDetectingLocation(false);
+      },
+      (err) => {
+        console.error("Geolocation error:", err);
+        setError(
+          err.code === 1
+            ? "Location permission denied. Please allow access and try again."
+            : "Could not determine your location. Please type it manually.",
+        );
+        setDetectingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }, [pickupGeo]);
 
-  /* ── socket event listeners ── */
   useEffect(() => {
     if (!socket) return;
 
@@ -172,9 +235,9 @@ const UserBookingPage = () => {
       setDriverLocation({ lat, lng });
     });
 
-    const offStatus = on("booking_status_changed", ({ status }) => {
-      if (status === "En-Route") setBookingState("en_route");
-      if (status === "Arrived") setBookingState("arrived");
+    const offStatus = on("booking_status_update", ({ status }) => {
+      if (status === "En-Route")  setBookingState("en_route");
+      if (status === "Arrived")   setBookingState("arrived");
       if (status === "Completed") setBookingState("completed");
     });
 
@@ -191,19 +254,15 @@ const UserBookingPage = () => {
     };
   }, [socket, on]);
 
-  /* ── timeout if no driver accepts within 2 min ── */
   useEffect(() => {
     if (bookingState !== "pending") return;
     const t = setTimeout(() => {
-      if (bookingState === "pending") {
-        setBookingState("cancelled");
-        setError("No driver accepted your booking. Please try again.");
-      }
+      setBookingState("cancelled");
+      setError("No driver accepted your booking. Please try again.");
     }, 120_000);
     return () => clearTimeout(t);
   }, [bookingState]);
 
-  /* ── confirm booking ── */
   const handleConfirm = async () => {
     if (!pickupCoords || !dropCoords) {
       setError("Select pickup and drop locations from the suggestions.");
@@ -216,10 +275,10 @@ const UserBookingPage = () => {
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/api/v1/booking`,
         {
-          pickupLat: pickupCoords.lat,
-          pickupLng: pickupCoords.lng,
-          dropLat: dropCoords.lat,
-          dropLng: dropCoords.lng,
+          pickupLat:   pickupCoords.lat,
+          pickupLng:   pickupCoords.lng,
+          dropLat:     dropCoords.lat,
+          dropLng:     dropCoords.lng,
           bookingType: ambulanceType,
         },
       );
@@ -235,23 +294,20 @@ const UserBookingPage = () => {
         );
       }
     } catch (err) {
-      setError(
-        err.response?.data?.error ?? "Failed to create booking. Try again.",
-      );
+      setError(err.response?.data?.error ?? "Failed to create booking. Try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  /* ── cancel booking ── */
   const handleCancel = useCallback(() => {
     if (booking?.bookingId) {
-      emit("cancel_booking", { bookingId: booking.bookingId });
+      // BUG FIX: was emitting "cancel_booking" — backend listens for "booking_cancellation"
+      emit("booking_cancellation", { bookingId: booking.bookingId });
     }
     setBookingState("cancelled");
   }, [booking, emit]);
 
-  /* ── reset to idle ── */
   const handleReset = () => {
     setBookingState("idle");
     setBooking(null);
@@ -268,7 +324,7 @@ const UserBookingPage = () => {
   if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-950 text-white">
-        Restoring session…
+        Restoring session...
       </div>
     );
   }
@@ -281,10 +337,8 @@ const UserBookingPage = () => {
     );
   }
 
-  /* ── render ── */
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Map layer */}
       <div className="absolute inset-0 z-0">
         <Map
           pickupLocation={pickupCoords}
@@ -293,16 +347,15 @@ const UserBookingPage = () => {
         />
       </div>
 
-      {/* ── Top navbar ── */}
       <div
         className="relative z-10 w-full bg-slate-950/75 backdrop-blur-md
-                      flex justify-between items-center px-6 py-3 shadow-lg"
+                   flex justify-between items-center px-6 py-3 shadow-lg"
       >
         <div className="flex items-center gap-3">
           <img
             src={ambulanceimage}
             className="w-9 h-9 rounded-full object-cover"
-            alt=""
+            alt="ResQRide"
           />
           <p className="text-white font-medium hidden sm:block">
             {user?.displayName || user?.userName}
@@ -311,29 +364,25 @@ const UserBookingPage = () => {
             className={`text-xs px-2 py-0.5 rounded-full font-medium
             ${connected ? "bg-emerald-900/60 text-emerald-400" : "bg-slate-700 text-slate-400"}`}
           >
-            {connected ? "live" : "connecting…"}
+            {connected ? "live" : "connecting..."}
           </span>
         </div>
         <Button
           variant="default"
           className="lg:h-10 h-9 bg-red-600 hover:bg-red-700 px-5"
         >
-          🚨 Emergency SOS
+          Emergency SOS
         </Button>
       </div>
 
-      {/* ── Bottom panel ── */}
       <div
         className="absolute bottom-0 left-0 right-0 z-10
-                      max-w-lg mx-auto w-full bg-slate-950/80 backdrop-blur-md
-                      rounded-t-2xl shadow-2xl px-5 pb-6 pt-4"
+                   max-w-lg mx-auto w-full bg-slate-950/80 backdrop-blur-md
+                   rounded-t-2xl shadow-2xl px-5 pb-6 pt-4"
       >
-        {/* ─── IDLE: booking form ─── */}
         {bookingState === "idle" && (
           <div className="space-y-4">
-            <p className="text-slate-300 text-sm font-semibold">
-              Book an Ambulance
-            </p>
+            <p className="text-slate-300 text-sm font-semibold">Book an Ambulance</p>
 
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
@@ -352,7 +401,9 @@ const UserBookingPage = () => {
               }}
               results={pickupGeo.results}
               loading={pickupGeo.loading}
-              placeholder="Search pickup address…"
+              placeholder="Search or use GPS..."
+              onDetectLocation={detectPickupLocation}
+              detectingLocation={detectingLocation}
             />
 
             <AddressField
@@ -370,19 +421,11 @@ const UserBookingPage = () => {
               }}
               results={dropGeo.results}
               loading={dropGeo.loading}
-              placeholder="Search hospital or address…"
+              placeholder="Search hospital or address..."
             />
 
-            {/* Ambulance type */}
-            <Tabs
-              value={ambulanceType}
-              onValueChange={setAmbulanceType}
-              className="w-full"
-            >
-              <TabsList
-                variant="line"
-                className="flex justify-between w-full gap-4 px-1"
-              >
+            <Tabs value={ambulanceType} onValueChange={setAmbulanceType} className="w-full">
+              <TabsList variant="line" className="flex justify-between w-full gap-4 px-1">
                 {AMBULANCE_TYPES.map(({ value, label, img }) => (
                   <TabsTrigger
                     key={value}
@@ -401,27 +444,24 @@ const UserBookingPage = () => {
               disabled={submitting || !pickupCoords || !dropCoords}
               className="w-full h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100"
             >
-              {submitting ? "Requesting…" : "Confirm Booking"}
+              {submitting ? "Requesting..." : "Confirm Booking"}
             </Button>
           </div>
         )}
 
-        {/* ─── PENDING: waiting for driver ─── */}
         {bookingState === "pending" && (
           <div className="space-y-4 text-center py-2">
             <div className="flex justify-center">
               <span
                 className="w-10 h-10 border-4 border-[#0077B6] border-t-transparent
-                               rounded-full animate-spin"
+                           rounded-full animate-spin"
               />
             </div>
-            <p className="text-slate-200 font-semibold">
-              Finding nearby drivers…
-            </p>
+            <p className="text-slate-200 font-semibold">Finding nearby drivers...</p>
             {fare && (
               <p className="text-slate-400 text-sm">
                 Estimated fare:{" "}
-                <span className="text-[#00B4D8] font-bold">₹{fare}</span>
+                <span className="text-[#00B4D8] font-bold">Rs. {fare}</span>
                 &nbsp;·&nbsp;{ambulanceType} ambulance
               </p>
             )}
@@ -435,61 +475,54 @@ const UserBookingPage = () => {
           </div>
         )}
 
-        {/* ─── CONFIRMED / EN-ROUTE / ARRIVED ─── */}
-        {["confirmed", "en_route", "arrived"].includes(bookingState) &&
-          driver && (
-            <div className="space-y-4">
-              <StatusBar
-                status={
-                  bookingState === "confirmed"
-                    ? "Confirmed"
-                    : bookingState === "en_route"
-                      ? "En-Route"
-                      : "Arrived"
-                }
-              />
+        {["confirmed", "en_route", "arrived"].includes(bookingState) && driver && (
+          <div className="space-y-4">
+            <StatusBar
+              status={
+                bookingState === "confirmed"
+                  ? "Confirmed"
+                  : bookingState === "en_route"
+                    ? "En-Route"
+                    : "Arrived"
+              }
+            />
 
-              <DriverCard driver={driver} />
+            <DriverCard driver={driver} />
 
-              <div className="flex gap-3">
-                <Button
-                  variant="ghost"
-                  onClick={handleCancel}
-                  disabled={bookingState === "arrived"}
-                  className="flex-1 border border-slate-700 text-slate-400 hover:text-red-400 text-sm h-9"
-                >
-                  Cancel ride
-                </Button>
-                <a
-                  href={`tel:${driver.phoneNumber}`}
-                  className={
-                    "flex-1 flex items-center justify-center gap-1.5 bg-emerald-800/40 hover:bg-emerald-700/40 border border-emerald-700text-emerald-400 rounded-md text-sm h-9 transition-colors"
-                  }
-                >
-                  📞 Call driver
-                </a>
-              </div>
+            <div className="flex gap-3">
+              <Button
+                variant="ghost"
+                onClick={handleCancel}
+                disabled={bookingState === "arrived"}
+                className="flex-1 border border-slate-700 text-slate-400 hover:text-red-400 text-sm h-9"
+              >
+                Cancel ride
+              </Button>
+              <a
+                href={`tel:${driver.phoneNumber}`}
+                className="flex-1 flex items-center justify-center gap-1.5
+                           bg-emerald-800/40 hover:bg-emerald-700/40 border border-emerald-700
+                           text-emerald-400 rounded-md text-sm h-9 transition-colors"
+              >
+                Call driver
+              </a>
             </div>
-          )}
+          </div>
+        )}
 
-        {/* ─── COMPLETED ─── */}
         {bookingState === "completed" && (
           <div className="space-y-4 text-center py-2">
             <div
               className="w-14 h-14 rounded-full bg-emerald-900/40 border-2 border-emerald-500
-                            flex items-center justify-center text-2xl mx-auto"
+                         flex items-center justify-center text-2xl mx-auto"
             >
-              ✓
+              OK
             </div>
-            <p className="text-slate-100 font-semibold text-base">
-              Ride completed
-            </p>
+            <p className="text-slate-100 font-semibold text-base">Ride completed</p>
             {fare && (
               <p className="text-slate-400 text-sm">
                 Total fare:{" "}
-                <span className="text-[#00B4D8] font-bold text-base">
-                  ₹{fare}
-                </span>
+                <span className="text-[#00B4D8] font-bold text-base">Rs. {fare}</span>
               </p>
             )}
             <Button
@@ -501,7 +534,6 @@ const UserBookingPage = () => {
           </div>
         )}
 
-        {/* ─── CANCELLED ─── */}
         {bookingState === "cancelled" && (
           <div className="space-y-4 text-center py-2">
             <p className="text-red-400 font-semibold">Booking cancelled</p>

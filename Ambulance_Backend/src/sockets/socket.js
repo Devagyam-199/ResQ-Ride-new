@@ -41,11 +41,9 @@ const initSocket = (server) => {
           },
         });
         socket.join("driver_pool");
-        console.log(
-          `[socket] driver ${userId} went online at [${lat},${long}]`,
-        );
+        console.log(`[socket] driver ${userId} went online at [${lat},${long}]`);
       } catch (error) {
-        console.error(`[socker] driver offline:${error.message}`);
+        console.error(`[socket] driver_online error: ${error.message}`);
       }
     });
 
@@ -57,7 +55,7 @@ const initSocket = (server) => {
         });
         socket.leave("driver_pool");
       } catch (err) {
-        console.error(`[socket] driver online: ${err.message}`);
+        console.error(`[socket] driver_offline error: ${err.message}`);
       }
     });
 
@@ -80,14 +78,15 @@ const initSocket = (server) => {
           }
         }
       } catch (err) {
-        console.error(`driver location couldn't be updated:${err.message}`);
+        console.error(`[socket] location_update error: ${err.message}`);
       }
     });
 
     socket.on("accept_booking", async ({ bookingId }) => {
       try {
         const booking = await Booking.findById(bookingId);
-        if (!booking || booking.status === "Pending") return;
+        if (!booking || booking.status !== "Pending") return;
+
         booking.driver = userId;
         booking.status = "Confirmed";
         await booking.save();
@@ -123,7 +122,7 @@ const initSocket = (server) => {
     });
 
     socket.on("reject_booking", ({ bookingId }) => {
-      console.log(`[socket] driver reject booking : ${bookingId}`);
+      console.log(`[socket] driver rejected booking: ${bookingId}`);
     });
 
     socket.on("booking_status_update", async ({ bookingId, status }) => {
@@ -133,12 +132,8 @@ const initSocket = (server) => {
       try {
         const booking = await Booking.findByIdAndUpdate(
           bookingId,
-          {
-            status,
-          },
-          {
-            new: true,
-          },
+          { status },
+          { new: true },
         ).select("user driver");
 
         if (!booking) return;
@@ -154,47 +149,42 @@ const initSocket = (server) => {
           bookingId,
           status,
         });
-        console.log(`[socket] booking ${bookingId} → ${status}`);
+        console.log(`[socket] booking ${bookingId} -> ${status}`);
       } catch (error) {
-        console.error("[socket] update_booking_status:", err.message);
+        console.error("[socket] booking_status_update:", error.message);
       }
     });
 
     socket.on("booking_cancellation", async ({ bookingId }) => {
       try {
         const booking = await Booking.findById(bookingId);
+        if (!booking || ["Completed", "Cancelled"].includes(booking.status)) return;
 
-        if ((!booking, ["Completed", "Cancelled"].includes(booking.status)))
-          return;
-
-        ((booking.status = "Cancelled"),
-          (booking.cancelledBy = "User"),
-          await booking.save());
+        booking.status = "Cancelled";
+        booking.cancelledBy = "User";
+        await booking.save();
 
         if (booking.driver) {
           await Driver.findByIdAndUpdate(booking.driver, {
             isAvailable: true,
             currentBooking: null,
           });
-          io.to(String(booking.driver)).emit("booking_cancelled", {
-            bookingId,
-          });
+          io.to(String(booking.driver)).emit("booking_cancelled", { bookingId });
         }
         console.log(`[socket] user cancelled booking ${bookingId}`);
       } catch (err) {
-        console.error("[socket] cancel_booking:", err.message);
+        console.error("[socket] booking_cancellation:", err.message);
       }
     });
 
     socket.on("disconnect", async () => {
       if (role === "Driver") {
-        await Driver.findByIdAndUpdate(userId, { isOnline: false }).catch(
-          () => {},
-        );
+        await Driver.findByIdAndUpdate(userId, { isOnline: false }).catch(() => {});
       }
       console.log(`[socket] ${role} ${userId} disconnected`);
     });
   });
+
   return io;
 };
 
