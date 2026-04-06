@@ -29,7 +29,9 @@ const haverSineCalculator = (lat1, lng1, lat2, lng2) => {
 };
 
 const fareCalculator = (distanceKm, bookingType = "Basic") => {
-  const rate = Rates[bookingType.toLowerCase()] ?? Rates.basic;
+  const key = bookingType.toLowerCase();
+  if (!Rates[key]) throw new Error(`Unknown bookingType: ${bookingType}`);
+  const rate = Rates[key];
   return Math.round(rate.rates + distanceKm * rate.perKM);
 };
 

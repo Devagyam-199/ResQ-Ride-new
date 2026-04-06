@@ -1,7 +1,3 @@
-// src/hooks/useGeoCoding.js
-// General address search — used for the PICKUP field.
-// Requires userCoords for location bias; blocks search without it.
-
 import { useState, useCallback, useRef } from "react";
 import axios from "axios";
 
@@ -15,10 +11,10 @@ const searchMappls = async (query, userCoords) => {
         query,
         rest_key: REST_KEY,
         region:   "IND",
-        pod:      "SLC",          // Sub-locality level — keeps results tight
+        pod:      "SLC",
         bridge:   true,
         location: `${userCoords.lat},${userCoords.lng}`,
-        zoom:     14,             // ~10 km radius preference
+        zoom:     14,
       },
     }
   );
@@ -41,7 +37,7 @@ const searchMappls = async (query, userCoords) => {
 };
 
 const searchNominatim = async (query, userCoords) => {
-  const d = 0.135; // ~15 km bounding box
+  const d = 0.135;
   const { data } = await axios.get(
     "https://nominatim.openstreetmap.org/search",
     {
@@ -78,10 +74,6 @@ const searchNominatim = async (query, userCoords) => {
   });
 };
 
-/**
- * General address geocoding hook.
- * @param {Object|null} userCoords — { lat, lng }. Search is blocked until provided.
- */
 const useGeocoding = (userCoords = null) => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);

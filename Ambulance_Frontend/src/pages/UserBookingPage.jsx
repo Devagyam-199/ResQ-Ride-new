@@ -238,7 +238,6 @@ const UserBookingPage = () => {
     return () => { offConfirmed(); offLocation(); offStatus(); offCancelled(); };
   }, [socket, on]);
 
-  // 2-minute timeout for pending bookings
   useEffect(() => {
     if (bookingState !== "pending") return;
     const t = setTimeout(() => {

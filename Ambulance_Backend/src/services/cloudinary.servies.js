@@ -40,7 +40,7 @@ const uploadToCloudinary = async (fileBuffer, options = {}) => {
     };
   } catch (error) {
     console.error("Cloudinary upload error:", error);
-    throw new ApiError(
+    throw new apiError(
       error.http_code || 500,
       error.message || "Failed to upload file to Cloudinary",
     );
