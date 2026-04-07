@@ -3,6 +3,13 @@ import { useEffect, useState } from "react";
 const useMsg91 = () => {
   const [sdkReady, setSdkReady] = useState(false);
   const [sdkError, setSdkError] = useState(null);
+  useEffect(() => {
+    console.log("Widget ID:", import.meta.env.VITE_MSG91_WIDGETID);
+    console.log(
+      "Token auth:",
+      import.meta.env.VITE_MSG91_TOKEN ? "SET" : "MISSING",
+    );
+  }, []);
 
   useEffect(() => {
     if (window.__msg91Loaded) {
@@ -34,7 +41,12 @@ const useMsg91 = () => {
     };
 
     script.onerror = () => {
-      setSdkError("Failed to load OTP SDK — check network");
+      const msg = "Failed to load OTP SDK — check network";
+      setSdkError(msg);
+      console.error(
+        msg,
+        "Check: CDN up, CSP allows verify.msg91.com, network stable",
+      );
     };
 
     document.head.appendChild(script);
@@ -49,7 +61,12 @@ const useMsg91 = () => {
 
   const verifyOtp = (otp) =>
     new Promise((resolve, reject) => {
-      if (!sdkReady) return reject(new Error("SDK not ready"));
+      if (!sdkReady) {
+        return reject(new Error("SDK not ready yet. Wait for sdkReady=true"));
+      }
+      if (!window.verifyOtp) {
+        return reject(new Error("window.verifyOtp is undefined"));
+      }
       window.verifyOtp(otp, resolve, reject);
     });
 
