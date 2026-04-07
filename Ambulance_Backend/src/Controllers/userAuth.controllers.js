@@ -16,7 +16,6 @@ export const verifyTokenController = async (req, res) => {
 
   try {
     const mobile = await verifyToken(accessToken);
-
     const phone = `+${mobile}`;
 
     const existingDriver = await Driver.findOne({ phoneNumber: phone });
@@ -34,6 +33,7 @@ export const verifyTokenController = async (req, res) => {
         return res
           .status(403)
           .json({ success: false, error: "Your account has been suspended." });
+
       const jwtToken = jwtGen(
         existingDriver._id,
         existingDriver.phoneNumber,
@@ -70,9 +70,33 @@ export const verifyTokenController = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select("-__v");
+    const { userId, role } = req.user;
+
+    if (role === "Driver") {
+      const driver = await Driver.findById(userId).select("-__v -password");
+      if (!driver)
+        return res
+          .status(404)
+          .json({ success: false, error: "Driver not found" });
+      return res
+        .status(200)
+        .json({ success: true, user: { ...driver.toObject(), role: "Driver" } });
+    }
+
+    if (role === "Admin") {
+      const admin = await User.findById(userId).select("-__v");
+      if (!admin)
+        return res
+          .status(404)
+          .json({ success: false, error: "Admin not found" });
+      return res.status(200).json({ success: true, user: admin });
+    }
+
+    const user = await User.findById(userId).select("-__v");
     if (!user)
-      return res.status(404).json({ success: false, error: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, error: "User not found" });
     return res.status(200).json({ success: true, user });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

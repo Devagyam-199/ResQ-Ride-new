@@ -8,6 +8,8 @@ import {
 import { reverseGeocode } from "../services/nominatimRevGeo.services.js";
 import { getIO } from "../sockets/socket.js";
 
+const ALLOWED_BOOKING_TYPES = ["Basic", "Advanced", "Mortuary"];
+
 const createBooking = async (req, res) => {
   try {
     const {
@@ -24,10 +26,23 @@ const createBooking = async (req, res) => {
         .json({ success: false, error: "All four coordinates are required" });
     }
 
+    if (!ALLOWED_BOOKING_TYPES.includes(bookingType)) {
+      return res.status(400).json({
+        success: false,
+        error: `bookingType must be one of: ${ALLOWED_BOOKING_TYPES.join(", ")}`,
+      });
+    }
+
     const pLat = parseFloat(pickupLat),
       pLng = parseFloat(pickupLng);
     const dLat = parseFloat(dropLat),
       dLng = parseFloat(dropLng);
+
+    if (isNaN(pLat) || isNaN(pLng) || isNaN(dLat) || isNaN(dLng)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Coordinates must be valid numbers" });
+    }
 
     const [pickupAddress, dropAddress] = await Promise.all([
       reverseGeocode(pLat, pLng),
@@ -139,12 +154,10 @@ const cancelBooking = async (req, res) => {
         .json({ success: false, error: "Booking not found" });
 
     if (["Completed", "Cancelled"].includes(booking.status)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: `Cannot cancel a ${booking.status} booking`,
-        });
+      return res.status(400).json({
+        success: false,
+        error: `Cannot cancel a ${booking.status} booking`,
+      });
     }
 
     booking.status = "Cancelled";

@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 
 const app = express();
 const corsOptions = {
-  origin: process.env.FRONTEND_DEPLOYEMENT_URL,
+  origin: process.env.FRONTEND_DEPLOYMENT_URL,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
@@ -20,8 +20,9 @@ app.use("/api/v1/auth", authRoute);
 import driverAuthRoute from "./Routes/driverAuth.routes.js";
 app.use("/api/v1/driver", driverAuthRoute);
 
-import bookingRoute from "./Routes/booking.routes.js"
-app.use("/api/v1/booking",bookingRoute);
+import bookingRoute from "./Routes/booking.routes.js";
+app.use("/api/v1/booking", bookingRoute);
+app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
 
 /************************** last line of code **************************/
 

@@ -44,7 +44,6 @@ const reverseGeocodeClient = async (lat, lng) => {
   }
 };
 
-// ── Generic address dropdown ──────────────────────────────────────────────────
 const AddressField = ({
   label,
   value,
@@ -161,13 +160,10 @@ const UserBookingPage = () => {
   const { user, token, loading: authLoading } = useAuth();
   const { socket, connected, emit, on }       = useSocket(token);
 
-  // Shared GPS coords — both hooks use this for location bias
   const [userCoords, setUserCoords] = useState(null);
 
-  // Pickup: general address search, biased to user location
   const pickupGeo = useGeocoding(userCoords);
 
-  // Drop: hospital-only search, hard-restricted to ~15 km
   const hospitalSearch = useHospitalSearch(userCoords);
 
   const [pickupText,    setPickupText]    = useState("");
@@ -185,7 +181,6 @@ const UserBookingPage = () => {
   const [error,          setError]          = useState("");
   const [submitting,     setSubmitting]     = useState(false);
 
-  // GPS detect — sets userCoords so both hooks unlock location-biased search
   const detectPickupLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");
@@ -196,7 +191,7 @@ const UserBookingPage = () => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
-        setUserCoords({ lat, lng });                     // unlocks both hooks
+        setUserCoords({ lat, lng });
         const label = await reverseGeocodeClient(lat, lng);
         setPickupText(label);
         setPickupCoords({ lat, lng });
@@ -321,7 +316,7 @@ const UserBookingPage = () => {
             {connected ? "live" : "connecting..."}
           </span>
         </div>
-        <Button variant="default" className="lg:h-10 h-9 bg-red-600 hover:bg-red-700 px-5">
+        <Button variant="default" className="lg:h-10 h-9 lg:w-1/5 sm:w-1/3 w-1/2 bg-red-600 hover:bg-red-700 px-5">
           Emergency SOS
         </Button>
       </div>
@@ -336,7 +331,6 @@ const UserBookingPage = () => {
 
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
-            {/* Pickup — general address */}
             <AddressField
               label="Pickup location"
               value={pickupText}
@@ -366,7 +360,6 @@ const UserBookingPage = () => {
               }
             />
 
-            {/* Ambulance type selector */}
             <Tabs value={ambulanceType} onValueChange={setAmbulanceType} className="w-full">
               <TabsList variant="line" className="flex justify-between w-full gap-4 px-1">
                 {AMBULANCE_TYPES.map(({ value, label, img }) => (

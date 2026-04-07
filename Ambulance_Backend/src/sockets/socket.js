@@ -8,7 +8,7 @@ let io;
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_DEPLOYEMENT_URL || "http://localhost:5173",
+      origin: process.env.FRONTEND_DEPLOYMENT_URL || "http://localhost:5173",
       methods: ["GET", "POST"],
       credentials: true,
     },
@@ -41,9 +41,7 @@ const initSocket = (server) => {
           },
         });
         socket.join("driver_pool");
-        console.log(
-          `[socket] driver ${userId} went online at [${lat},${long}]`,
-        );
+        console.log(`[socket] driver ${userId} went online at [${lat},${long}]`);
       } catch (error) {
         console.error(`[socket] driver_online error: ${error.message}`);
       }
@@ -86,13 +84,12 @@ const initSocket = (server) => {
 
     socket.on("accept_booking", async ({ bookingId }) => {
       try {
-        const booking = await Booking.findOneAndUpdate(
-          { _id: bookingId, status: "Pending" },
-          { driver: userId, status: "Confirmed" },
-          { new: true },
-        );
+        const booking = await Booking.findById(bookingId);
+        if (!booking || booking.status !== "Pending") return;
+
+        booking.driver = userId;
+        booking.status = "Confirmed";
         await booking.save();
-        if (!booking) return;
 
         await Driver.findByIdAndUpdate(userId, {
           isAvailable: false,
@@ -161,8 +158,7 @@ const initSocket = (server) => {
     socket.on("booking_cancellation", async ({ bookingId }) => {
       try {
         const booking = await Booking.findById(bookingId);
-        if (!booking || ["Completed", "Cancelled"].includes(booking.status))
-          return;
+        if (!booking || ["Completed", "Cancelled"].includes(booking.status)) return;
 
         booking.status = "Cancelled";
         booking.cancelledBy = "User";
@@ -173,21 +169,41 @@ const initSocket = (server) => {
             isAvailable: true,
             currentBooking: null,
           });
-          io.to(String(booking.driver)).emit("booking_cancelled", {
-            bookingId,
-          });
+          io.to(String(booking.driver)).emit("booking_cancelled", { bookingId });
         }
         console.log(`[socket] user cancelled booking ${bookingId}`);
       } catch (err) {
         console.error("[socket] booking_cancellation:", err.message);
       }
     });
-
     socket.on("disconnect", async () => {
       if (role === "Driver") {
-        await Driver.findByIdAndUpdate(userId, { isOnline: false }).catch(
-          () => {},
-        );
+        try {
+          const driver = await Driver.findById(userId).select("currentBooking");
+          if (driver?.currentBooking) {
+            const booking = await Booking.findById(driver.currentBooking);
+            if (booking && !["Completed", "Cancelled"].includes(booking.status)) {
+              booking.status = "Cancelled";
+              booking.cancelledBy = "Driver";
+              booking.cancelReason = "Driver disconnected unexpectedly";
+              await booking.save();
+
+              io.to(String(booking.user)).emit("booking_cancelled", {
+                bookingId: String(booking._id),
+                reason: "Driver disconnected. Please rebook.",
+              });
+              console.log(`[socket] auto-cancelled booking ${booking._id} on driver disconnect`);
+            }
+          }
+
+          await Driver.findByIdAndUpdate(userId, {
+            isOnline: false,
+            isAvailable: true,
+            currentBooking: null,
+          });
+        } catch (err) {
+          console.error(`[socket] disconnect cleanup error: ${err.message}`);
+        }
       }
       console.log(`[socket] ${role} ${userId} disconnected`);
     });

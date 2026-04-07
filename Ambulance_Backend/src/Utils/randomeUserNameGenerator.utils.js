@@ -1,19 +1,16 @@
 import User from "../Models/Users.models.js";
-
 const userNameGenerator = async () => {
-  let username;
-  let notUnique = true;
-  while (notUnique) {
-    const randomNumGen = Math.floor(1000 + Math.random() * 9000);
-    username = `user_${randomNumGen}`;
+  const MAX_ATTEMPTS = 10;
 
-    const user = await User.findOne({
-      userName: username,
-    });
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const suffix = Math.random().toString(16).slice(2, 10);
+    const username = `user_${suffix}`;
 
-    if (!user) notUnique = false;
+    const existing = await User.findOne({ userName: username }).lean();
+    if (!existing) return username;
   }
-  return username;
+
+  return `user_${Date.now().toString(16)}`;
 };
 
 export default userNameGenerator;
