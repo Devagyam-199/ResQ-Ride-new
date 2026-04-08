@@ -1,41 +1,29 @@
 import { useState, useCallback, createContext, useContext, useEffect } from "react";
-import axios from "axios";
+import api, { setAuthToken } from "@/lib/api";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser]     = useState(null);
-  const [token, setToken]   = useState(null);
+  const [user, setUser]       = useState(null);
+  const [token, setToken]     = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loginWithToken = useCallback(async (accessToken) => {
-    const res = await axios.post(
-      `${import.meta.env.VITE_API_URL}/api/v1/auth/verify`,
-      { accessToken }
-    );
-
+    const res = await api.post("/api/v1/auth/verify", { accessToken });
     const { accessToken: jwt, user: userData } = res.data.data;
-
     localStorage.setItem("accessToken", jwt);
     setToken(jwt);
     setUser(userData);
-    axios.defaults.headers.common["Authorization"] = `Bearer ${jwt}`;
-
+    setAuthToken(jwt);
     return userData;
   }, []);
 
   const restoreFromJwt = useCallback(async (jwt) => {
-    const res = await axios.get(
-      `${import.meta.env.VITE_API_URL}/api/v1/auth/user`,
-      { headers: { Authorization: `Bearer ${jwt}` } }
-    );
-
+    setAuthToken(jwt);
+    const res = await api.get("/api/v1/auth/user");
     const userData = res.data.user;
-
     setToken(jwt);
     setUser(userData);
-    axios.defaults.headers.common["Authorization"] = `Bearer ${jwt}`;
-
     return userData;
   }, []);
 
@@ -45,15 +33,13 @@ export const AuthProvider = ({ children }) => {
       if (savedToken) {
         try {
           await restoreFromJwt(savedToken);
-        } catch (err) {
-          console.error("Session restore failed:", err);
+        } catch {
           localStorage.removeItem("accessToken");
-          delete axios.defaults.headers.common["Authorization"];
+          setAuthToken(null);
         }
       }
       setLoading(false);
     };
-
     restoreSession();
   }, [restoreFromJwt]);
 
@@ -61,13 +47,11 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     localStorage.removeItem("accessToken");
-    delete axios.defaults.headers.common["Authorization"];
+    setAuthToken(null);
   }, []);
 
   return (
-    <AuthContext.Provider
-      value={{ user, token, loading, loginWithToken, logout }}
-    >
+    <AuthContext.Provider value={{ user, token, loading, loginWithToken, logout }}>
       {children}
     </AuthContext.Provider>
   );

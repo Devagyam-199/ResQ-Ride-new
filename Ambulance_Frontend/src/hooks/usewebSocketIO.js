@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 
 const useSocket = (token) => {
-  const ref       = useRef(null);
+  const ref             = useRef(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -11,7 +11,6 @@ const useSocket = (token) => {
     const socket = io(import.meta.env.VITE_API_URL, {
       auth:       { token },
       transports: ["websocket"],
-      reconnectionAttempts: 5,
     });
 
     socket.on("connect",    () => setConnected(true));

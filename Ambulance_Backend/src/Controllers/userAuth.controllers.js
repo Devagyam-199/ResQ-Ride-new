@@ -5,7 +5,7 @@ import Driver from "../Models/Driver.models.js";
 import userNameGenerator from "../Utils/randomeUserNameGenerator.utils.js";
 
 export const verifyTokenController = async (req, res) => {
-  const { accessToken, role = "User" } = req.body;
+  const { accessToken } = req.body;
 
   if (!accessToken) {
     return res.status(400).json({
@@ -16,29 +16,18 @@ export const verifyTokenController = async (req, res) => {
 
   try {
     const mobile = await verifyToken(accessToken);
-    const phone = `+${mobile}`;
+    const phone  = `+${mobile}`;
 
     const existingDriver = await Driver.findOne({ phoneNumber: phone });
     if (existingDriver) {
       if (existingDriver.accStatus === "Pending")
-        return res.status(403).json({
-          success: false,
-          error: "Your account is pending admin approval.",
-        });
+        return res.status(403).json({ success: false, error: "Your account is pending admin approval." });
       if (existingDriver.accStatus === "Rejected")
-        return res
-          .status(403)
-          .json({ success: false, error: "Your registration was rejected." });
+        return res.status(403).json({ success: false, error: "Your registration was rejected." });
       if (existingDriver.accStatus === "Suspended")
-        return res
-          .status(403)
-          .json({ success: false, error: "Your account has been suspended." });
+        return res.status(403).json({ success: false, error: "Your account has been suspended." });
 
-      const jwtToken = jwtGen(
-        existingDriver._id,
-        existingDriver.phoneNumber,
-        "Driver",
-      );
+      const jwtToken = jwtGen(existingDriver._id, existingDriver.phoneNumber, "Driver");
       return res.status(200).json({
         success: true,
         message: "Authenticated successfully",
@@ -50,13 +39,13 @@ export const verifyTokenController = async (req, res) => {
     }
 
     let user = await User.findOne({ phoneNumber: phone });
-    const username = await userNameGenerator();
-    if (!user)
-      user = await User.create({
-        phoneNumber: phone,
-        role: "User",
-        userName: username,
-      });
+    if (!user) {
+      const username = await userNameGenerator();
+      user = await User.create({ phoneNumber: phone, role: "User", userName: username });
+    }
+
+    await User.findByIdAndUpdate(user._id, { lastLoginAt: new Date() });
+
     const jwtToken = jwtGen(user._id, user.phoneNumber, user.role);
     return res.status(200).json({
       success: true,
@@ -74,29 +63,18 @@ export const getMe = async (req, res) => {
 
     if (role === "Driver") {
       const driver = await Driver.findById(userId).select("-__v -password");
-      if (!driver)
-        return res
-          .status(404)
-          .json({ success: false, error: "Driver not found" });
-      return res
-        .status(200)
-        .json({ success: true, user: { ...driver.toObject(), role: "Driver" } });
+      if (!driver) return res.status(404).json({ success: false, error: "Driver not found" });
+      return res.status(200).json({ success: true, user: { ...driver.toObject(), role: "Driver" } });
     }
 
     if (role === "Admin") {
       const admin = await User.findById(userId).select("-__v");
-      if (!admin)
-        return res
-          .status(404)
-          .json({ success: false, error: "Admin not found" });
+      if (!admin) return res.status(404).json({ success: false, error: "Admin not found" });
       return res.status(200).json({ success: true, user: admin });
     }
 
     const user = await User.findById(userId).select("-__v");
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, error: "User not found" });
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
     return res.status(200).json({ success: true, user });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

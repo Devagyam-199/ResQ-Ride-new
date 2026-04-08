@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Map from "@/components/ui/Map.jsx";
@@ -22,15 +23,11 @@ const STATUS_STEPS = ["Confirmed", "En-Route", "Arrived", "Completed"];
 
 const reverseGeocodeClient = async (lat, lng) => {
   try {
-    const { data } = await axios.get(
-      "https://nominatim.openstreetmap.org/reverse",
-      {
-        params: { lat, lon: lng, format: "json", addressdetails: 1 },
-        headers: { "User-Agent": "ResQRide/1.0 (contact@resqride.in)" },
-      },
-    );
+    const { data } = await axios.get("https://nominatim.openstreetmap.org/reverse", {
+      params: { lat, lon: lng, format: "json", addressdetails: 1 },
+    });
     if (!data || data.error) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    const a = data.address || {};
+    const a     = data.address || {};
     const parts = [
       a.road || a.pedestrian || a.neighbourhood,
       a.suburb || a.village || a.town,
@@ -60,9 +57,7 @@ const AddressField = ({
 
   return (
     <div className="relative">
-      <label className="text-slate-300 text-xs font-medium mb-1 block">
-        {label}
-      </label>
+      <label className="text-slate-300 text-xs font-medium mb-1 block">{label}</label>
       <div className="flex gap-2">
         <input
           value={value}
@@ -88,15 +83,10 @@ const AddressField = ({
         )}
       </div>
 
-      {/* hint shown below the field (e.g. "use GPS first") */}
-      {hint && (
-        <p className="text-amber-400 text-xs mt-1">{hint}</p>
-      )}
+      {hint && <p className="text-amber-400 text-xs mt-1">{hint}</p>}
 
       {loading && (
-        <span className="absolute right-14 top-8 text-xs text-slate-500">
-          searching...
-        </span>
+        <span className="absolute right-14 top-8 text-xs text-slate-500">searching...</span>
       )}
 
       {open && results.length > 0 && (
@@ -155,31 +145,27 @@ const StatusBar = ({ status }) => {
   );
 };
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 const UserBookingPage = () => {
   const { user, token, loading: authLoading } = useAuth();
   const { socket, connected, emit, on }       = useSocket(token);
 
-  const [userCoords, setUserCoords] = useState(null);
+  const [userCoords,        setUserCoords]        = useState(null);
+  const [pickupText,        setPickupText]         = useState("");
+  const [dropText,          setDropText]           = useState("");
+  const [pickupCoords,      setPickupCoords]       = useState(null);
+  const [dropCoords,        setDropCoords]         = useState(null);
+  const [ambulanceType,     setAmbulanceType]      = useState("Basic");
+  const [detectingLocation, setDetectingLocation]  = useState(false);
+  const [bookingState,      setBookingState]       = useState("idle");
+  const [booking,           setBooking]            = useState(null);
+  const [driver,            setDriver]             = useState(null);
+  const [driverLocation,    setDriverLocation]     = useState(null);
+  const [fare,              setFare]               = useState(null);
+  const [error,             setError]              = useState("");
+  const [submitting,        setSubmitting]         = useState(false);
 
-  const pickupGeo = useGeocoding(userCoords);
-
+  const pickupGeo     = useGeocoding(userCoords);
   const hospitalSearch = useHospitalSearch(userCoords);
-
-  const [pickupText,    setPickupText]    = useState("");
-  const [dropText,      setDropText]      = useState("");
-  const [pickupCoords,  setPickupCoords]  = useState(null);
-  const [dropCoords,    setDropCoords]    = useState(null);
-  const [ambulanceType, setAmbulanceType] = useState("Basic");
-  const [detectingLocation, setDetectingLocation] = useState(false);
-
-  const [bookingState,   setBookingState]   = useState("idle");
-  const [booking,        setBooking]        = useState(null);
-  const [driver,         setDriver]         = useState(null);
-  const [driverLocation, setDriverLocation] = useState(null);
-  const [fare,           setFare]           = useState(null);
-  const [error,          setError]          = useState("");
-  const [submitting,     setSubmitting]     = useState(false);
 
   const detectPickupLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -210,7 +196,6 @@ const UserBookingPage = () => {
     );
   }, [pickupGeo]);
 
-  // Socket listeners
   useEffect(() => {
     if (!socket) return;
     const offConfirmed = on("booking_confirmed", ({ driver: d }) => {
@@ -250,16 +235,13 @@ const UserBookingPage = () => {
     setError("");
     setSubmitting(true);
     try {
-      const { data } = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/v1/booking`,
-        {
-          pickupLat:   pickupCoords.lat,
-          pickupLng:   pickupCoords.lng,
-          dropLat:     dropCoords.lat,
-          dropLng:     dropCoords.lng,
-          bookingType: ambulanceType,
-        },
-      );
+      const { data } = await api.post("/api/v1/booking", {
+        pickupLat:   pickupCoords.lat,
+        pickupLng:   pickupCoords.lng,
+        dropLat:     dropCoords.lat,
+        dropLng:     dropCoords.lng,
+        bookingType: ambulanceType,
+      });
       setBooking(data.data);
       setFare(data.data.fare);
       setBookingState("pending");
@@ -301,12 +283,10 @@ const UserBookingPage = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Map layer */}
       <div className="absolute inset-0 z-0">
         <Map pickupLocation={pickupCoords} dropLocation={dropCoords} driverLocation={driverLocation} />
       </div>
 
-      {/* Top nav */}
       <div className="relative z-10 w-full bg-slate-950/75 backdrop-blur-md flex justify-between items-center px-6 py-3 shadow-lg">
         <div className="flex items-center gap-3">
           <img src={ambulanceimage} className="w-9 h-9 rounded-full object-cover" alt="ResQRide" />
@@ -316,12 +296,16 @@ const UserBookingPage = () => {
             {connected ? "live" : "connecting..."}
           </span>
         </div>
-        <Button variant="default" className="lg:h-10 h-9 lg:w-1/5 sm:w-1/3 w-1/2 bg-red-600 hover:bg-red-700 px-5">
+        <a
+          href="tel:108"
+          className="inline-flex items-center justify-center lg:h-10 h-9 lg:w-1/5 sm:w-1/3 w-1/2
+                     bg-red-600 hover:bg-red-700 text-slate-100 rounded-md text-sm font-medium
+                     transition-all px-5"
+        >
           Emergency SOS
-        </Button>
+        </a>
       </div>
 
-      {/* Bottom panel */}
       <div className="absolute bottom-0 left-0 right-0 z-10 max-w-lg mx-auto w-full
                       bg-slate-950/80 backdrop-blur-md rounded-t-2xl shadow-2xl px-5 pb-6 pt-4">
 
@@ -344,9 +328,8 @@ const UserBookingPage = () => {
               hint={!userCoords ? "Tap GPS to enable location-based search" : null}
             />
 
-            {/* Drop — hospitals only, within ~15 km */}
             <AddressField
-              label="Drop / hospital  (nearby only)"
+              label="Drop / hospital (nearby only)"
               value={dropText}
               onChange={(v) => { setDropText(v); setDropCoords(null); hospitalSearch.search(v); }}
               onSelect={(r)  => { setDropText(r.short_name); setDropCoords({ lat: r.lat, lng: r.lng }); hospitalSearch.clear(); }}

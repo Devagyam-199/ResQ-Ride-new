@@ -8,8 +8,8 @@ let io;
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_DEPLOYMENT_URL || "http://localhost:5173",
-      methods: ["GET", "POST"],
+      origin:      process.env.FRONTEND_DEPLOYMENT_URL || "http://localhost:5173",
+      methods:     ["GET", "POST"],
       credentials: true,
     },
   });
@@ -20,7 +20,7 @@ const initSocket = (server) => {
     try {
       socket.user = jwt.verify(token, process.env.Access_Token_Secret);
       next();
-    } catch (error) {
+    } catch {
       next(new Error("Invalid Token"));
     }
   });
@@ -30,54 +30,38 @@ const initSocket = (server) => {
     socket.join(String(userId));
     console.log(`[socket] ${role} ${userId} connected`);
 
-    // FIX: was destructuring { lat, long } — frontend emits { lat, lng }
     socket.on("driver_online", async ({ lat, lng }) => {
       try {
         await Driver.findByIdAndUpdate(userId, {
           isAvailable: true,
-          isOnline: true,
-          location: {
-            type: "Point",
-            coordinates: [lng, lat], // MongoDB: [longitude, latitude]
-          },
+          isOnline:    true,
+          location:    { type: "Point", coordinates: [lng, lat] },
         });
         socket.join("driver_pool");
-        console.log(`[socket] driver ${userId} went online at [${lat},${lng}]`);
-      } catch (error) {
-        console.error(`[socket] driver_online error: ${error.message}`);
+        console.log(`[socket] driver ${userId} online at [${lat},${lng}]`);
+      } catch (err) {
+        console.error(`[socket] driver_online error: ${err.message}`);
       }
     });
 
     socket.on("driver_offline", async () => {
       try {
-        await Driver.findByIdAndUpdate(userId, {
-          isAvailable: false,
-          isOnline: false,
-        });
+        await Driver.findByIdAndUpdate(userId, { isAvailable: false, isOnline: false });
         socket.leave("driver_pool");
       } catch (err) {
         console.error(`[socket] driver_offline error: ${err.message}`);
       }
     });
 
-    // FIX: was destructuring { lat, long, bookingId } — frontend emits { lat, lng, bookingId }
     socket.on("location_update", async ({ lat, lng, bookingId }) => {
       try {
         await Driver.findByIdAndUpdate(userId, {
-          location: {
-            type: "Point",
-            coordinates: [lng, lat],
-          },
+          location: { type: "Point", coordinates: [lng, lat] },
         });
         if (bookingId) {
           const booking = await Booking.findById(bookingId).select("user");
           if (booking) {
-            // FIX: was emitting { lat, long } — frontend reads { lat, lng }
-            io.to(String(booking.user)).emit("driver_location", {
-              lat,
-              lng,
-              bookingId,
-            });
+            io.to(String(booking.user)).emit("driver_location", { lat, lng, bookingId });
           }
         }
       } catch (err) {
@@ -87,15 +71,16 @@ const initSocket = (server) => {
 
     socket.on("accept_booking", async ({ bookingId }) => {
       try {
-        const booking = await Booking.findById(bookingId);
-        if (!booking || booking.status !== "Pending") return;
+        const booking = await Booking.findOneAndUpdate(
+          { _id: bookingId, status: "Pending" },
+          { $set: { driver: userId, status: "Confirmed" } },
+          { new: true },
+        );
 
-        booking.driver = userId;
-        booking.status = "Confirmed";
-        await booking.save();
+        if (!booking) return;
 
         await Driver.findByIdAndUpdate(userId, {
-          isAvailable: false,
+          isAvailable:    false,
           currentBooking: bookingId,
         });
 
@@ -103,18 +88,17 @@ const initSocket = (server) => {
           "name phoneNumber vehicleNumber vehicleType driverPhoto location",
         );
 
-        // FIX: was emitting { lat, long } — frontend reads { lat, lng }
         io.to(String(booking.user)).emit("booking_confirmed", {
           bookingId,
           driver: {
-            id: String(userId),
-            name: driver.name,
-            phoneNumber: driver.phoneNumber,
+            id:            String(userId),
+            name:          driver.name,
+            phoneNumber:   driver.phoneNumber,
             vehicleNumber: driver.vehicleNumber,
-            vehicleType: driver.vehicleType,
-            photo: driver.driverPhoto?.secure_url ?? null,
-            lat: driver.location.coordinates[1],
-            lng: driver.location.coordinates[0], // FIX: was "long"
+            vehicleType:   driver.vehicleType,
+            photo:         driver.driverPhoto?.secure_url ?? null,
+            lat:           driver.location.coordinates[1],
+            lng:           driver.location.coordinates[0],
           },
         });
 
@@ -126,7 +110,7 @@ const initSocket = (server) => {
     });
 
     socket.on("reject_booking", ({ bookingId }) => {
-      console.log(`[socket] driver rejected booking: ${bookingId}`);
+      console.log(`[socket] driver ${userId} rejected booking ${bookingId}`);
     });
 
     socket.on("booking_status_update", async ({ bookingId, status }) => {
@@ -134,28 +118,17 @@ const initSocket = (server) => {
       if (!allowed.includes(status)) return;
 
       try {
-        const booking = await Booking.findByIdAndUpdate(
-          bookingId,
-          { status },
-          { new: true },
-        ).select("user driver");
-
+        const booking = await Booking.findByIdAndUpdate(bookingId, { status }, { new: true }).select("user driver");
         if (!booking) return;
 
         if (status === "Completed") {
-          await Driver.findByIdAndUpdate(userId, {
-            isAvailable: true,
-            currentBooking: null,
-          });
+          await Driver.findByIdAndUpdate(userId, { isAvailable: true, currentBooking: null });
         }
 
-        io.to(String(booking.user)).emit("booking_status_update", {
-          bookingId,
-          status,
-        });
+        io.to(String(booking.user)).emit("booking_status_update", { bookingId, status });
         console.log(`[socket] booking ${bookingId} -> ${status}`);
-      } catch (error) {
-        console.error("[socket] booking_status_update:", error.message);
+      } catch (err) {
+        console.error("[socket] booking_status_update:", err.message);
       }
     });
 
@@ -164,15 +137,12 @@ const initSocket = (server) => {
         const booking = await Booking.findById(bookingId);
         if (!booking || ["Completed", "Cancelled"].includes(booking.status)) return;
 
-        booking.status = "Cancelled";
+        booking.status      = "Cancelled";
         booking.cancelledBy = "User";
         await booking.save();
 
         if (booking.driver) {
-          await Driver.findByIdAndUpdate(booking.driver, {
-            isAvailable: true,
-            currentBooking: null,
-          });
+          await Driver.findByIdAndUpdate(booking.driver, { isAvailable: true, currentBooking: null });
           io.to(String(booking.driver)).emit("booking_cancelled", { bookingId });
         }
         console.log(`[socket] user cancelled booking ${bookingId}`);
@@ -188,22 +158,22 @@ const initSocket = (server) => {
           if (driver?.currentBooking) {
             const booking = await Booking.findById(driver.currentBooking);
             if (booking && !["Completed", "Cancelled"].includes(booking.status)) {
-              booking.status = "Cancelled";
-              booking.cancelledBy = "Driver";
+              booking.status       = "Cancelled";
+              booking.cancelledBy  = "Driver";
               booking.cancelReason = "Driver disconnected unexpectedly";
               await booking.save();
 
               io.to(String(booking.user)).emit("booking_cancelled", {
                 bookingId: String(booking._id),
-                reason: "Driver disconnected. Please rebook.",
+                reason:    "Driver disconnected. Please rebook.",
               });
               console.log(`[socket] auto-cancelled booking ${booking._id} on driver disconnect`);
             }
           }
 
           await Driver.findByIdAndUpdate(userId, {
-            isOnline: false,
-            isAvailable: true,
+            isOnline:       false,
+            isAvailable:    true,
             currentBooking: null,
           });
         } catch (err) {

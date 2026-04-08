@@ -1,15 +1,10 @@
 import { useState, useCallback, useRef } from "react";
 import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import api from "@/lib/api";
 
 const searchMappls = async (query, userCoords) => {
-  const { data } = await axios.get(`${API_URL}/api/v1/places/search`, {
-    params: {
-      query,
-      lat: userCoords.lat,
-      lng: userCoords.lng,
-    },
+  const { data } = await api.get("/api/v1/places/search", {
+    params: { query, lat: userCoords.lat, lng: userCoords.lng },
   });
 
   return (data?.suggestedLocations ?? []).map((r) => {
@@ -19,7 +14,6 @@ const searchMappls = async (query, userCoords) => {
       t.locality || t.subLocality || t.village,
       t.city || t.district,
     ].filter(Boolean);
-
     return {
       display_name: r.placeName + (r.placeAddress ? `, ${r.placeAddress}` : ""),
       short_name:   parts.slice(0, 3).join(", "),
@@ -31,22 +25,18 @@ const searchMappls = async (query, userCoords) => {
 
 const searchNominatim = async (query, userCoords) => {
   const d = 0.135;
-  const { data } = await axios.get(
-    "https://nominatim.openstreetmap.org/search",
-    {
-      params: {
-        q:              query,
-        format:         "json",
-        limit:          7,
-        countrycodes:   "in",
-        addressdetails: 1,
-        dedupe:         1,
-        viewbox:        `${userCoords.lng - d},${userCoords.lat + d},${userCoords.lng + d},${userCoords.lat - d}`,
-        bounded:        1,
-      },
-      // NOTE: Do NOT set User-Agent — browsers block it as an unsafe header
-    }
-  );
+  const { data } = await axios.get("https://nominatim.openstreetmap.org/search", {
+    params: {
+      q:              query,
+      format:         "json",
+      limit:          7,
+      countrycodes:   "in",
+      addressdetails: 1,
+      dedupe:         1,
+      viewbox:        `${userCoords.lng - d},${userCoords.lat + d},${userCoords.lng + d},${userCoords.lat - d}`,
+      bounded:        1,
+    },
+  });
 
   return data.map((r) => {
     const a     = r.address ?? {};
@@ -81,8 +71,8 @@ const useGeocoding = (userCoords = null) => {
       timer.current = setTimeout(async () => {
         setLoading(true);
         try {
-          const results = await searchMappls(query, userCoords);
-          if (results.length) { setResults(results); return; }
+          const res = await searchMappls(query, userCoords);
+          if (res.length) { setResults(res); return; }
           setResults(await searchNominatim(query, userCoords));
         } catch {
           try   { setResults(await searchNominatim(query, userCoords)); }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "@/lib/api";
 import useMsg91 from "@/hooks/useMsg91";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -13,11 +13,10 @@ import ambulanceimage from "@/assets/ambulance_authpage.png";
 
 const STEPS = ["Details", "Documents", "Phone", "Verify", "Done"];
 
-/* ─── small helpers ─── */
 const StepIndicator = ({ current }) => (
-  <div className="flex items-center justify-center  gap-2 mb-6">
+  <div className="flex items-center justify-center gap-2 mb-6">
     {STEPS.map((label, i) => {
-      const done = i < current;
+      const done   = i < current;
       const active = i === current;
       return (
         <div key={label} className="flex items-center gap-2">
@@ -35,9 +34,7 @@ const StepIndicator = ({ current }) => (
             </span>
           </div>
           {i < STEPS.length - 1 && (
-            <div
-              className={`w-4 sm:w-10 h-0.5 sm:mb-4 transition-all duration-300 ${done ? "bg-[#00B4D8]" : "bg-slate-700"}`}
-            />
+            <div className={`w-4 sm:w-10 h-0.5 sm:mb-4 transition-all duration-300 ${done ? "bg-[#00B4D8]" : "bg-slate-700"}`} />
           )}
         </div>
       );
@@ -72,20 +69,13 @@ const FileUploadBox = ({ label, hint, accept, file, onChange, error }) => (
       py-6 px-4 cursor-pointer transition-all duration-200
       ${error ? "border-red-500/50 bg-red-900/10" : file ? "border-[#00B4D8]/60 bg-[#0077B6]/10" : "border-slate-700 hover:border-slate-500 bg-slate-800/40"}`}
     >
-      <input
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={onChange}
-      />
+      <input type="file" accept={accept} className="hidden" onChange={onChange} />
       {file ? (
         <>
           <div className="w-8 h-8 rounded-full bg-[#0077B6]/30 flex items-center justify-center">
             <span className="text-[#00B4D8] text-base">✓</span>
           </div>
-          <span className="text-[#00B4D8] text-xs text-center font-medium truncate max-w-full px-2">
-            {file.name}
-          </span>
+          <span className="text-[#00B4D8] text-xs text-center font-medium truncate max-w-full px-2">{file.name}</span>
           <span className="text-slate-500 text-xs">click to change</span>
         </>
       ) : (
@@ -101,38 +91,28 @@ const FileUploadBox = ({ label, hint, accept, file, onChange, error }) => (
   </div>
 );
 
-/* ─── main page ─── */
 export default function DriverRegisterPage() {
   const navigate = useNavigate();
   const { sdkReady, sdkError, sendOtp, verifyOtp } = useMsg91();
 
-  /* step state */
-  const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [step,        setStep]        = useState(0);
+  const [loading,     setLoading]     = useState(false);
   const [globalError, setGlobalError] = useState("");
 
-  /* form data */
   const [form, setForm] = useState({
-    name: "",
-    vehicleNumber: "",
-    vehicleType: "BLS",
-    email: "",
+    name: "", vehicleNumber: "", vehicleType: "BLS", email: "",
   });
   const [formErrors, setFormErrors] = useState({});
 
-  /* file data */
-  const [photo, setPhoto] = useState(null);
-  const [license, setLicense] = useState(null);
+  const [photo,      setPhoto]      = useState(null);
+  const [license,    setLicense]    = useState(null);
   const [fileErrors, setFileErrors] = useState({});
 
-  /* phone / otp */
-  const [phone, setPhone] = useState("+91");
-  const [phoneError, setPhoneError] = useState("");
+  const [phone,       setPhone]       = useState("+91");
+  const [phoneError,  setPhoneError]  = useState("");
   const [resendTimer, setResendTimer] = useState(0);
   const [resendCount, setResendCount] = useState(0);
-  const [accessToken, setAccessToken] = useState(null);
 
-  /* ── helpers ── */
   const digits = phone.replace("+91", "");
 
   const setField = (key) => (e) => {
@@ -144,10 +124,7 @@ export default function DriverRegisterPage() {
     setResendTimer(15);
     const id = setInterval(() => {
       setResendTimer((t) => {
-        if (t <= 1) {
-          clearInterval(id);
-          return 0;
-        }
+        if (t <= 1) { clearInterval(id); return 0; }
         return t - 1;
       });
     }, 1000);
@@ -155,35 +132,27 @@ export default function DriverRegisterPage() {
 
   const validateDetails = () => {
     const e = {};
-    if (!form.name.trim()) e.name = "Name is required";
-    if (!form.vehicleNumber.trim())
-      e.vehicleNumber = "Vehicle number is required";
-    if (!form.vehicleType) e.vehicleType = "Vehicle type is required";
+    if (!form.name.trim())           e.name          = "Name is required";
+    if (!form.vehicleNumber.trim())  e.vehicleNumber  = "Vehicle number is required";
+    if (!form.vehicleType)           e.vehicleType    = "Vehicle type is required";
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = "Enter a valid email address";
     setFormErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleDetailsNext = () => {
-    if (validateDetails()) setStep(1);
-  };
+  const handleDetailsNext = () => { if (validateDetails()) setStep(1); };
 
   const handleDocumentsNext = () => {
     const e = {};
-    if (!photo) e.photo = "Driver photo is required";
+    if (!photo)   e.photo   = "Driver photo is required";
     if (!license) e.license = "License document is required";
     setFileErrors(e);
     if (Object.keys(e).length === 0) setStep(2);
   };
 
-  /* ── step 2: send OTP ── */
   const handleSendOtp = async () => {
-    const d = digits;
-    if (!d || d.length < 10) {
-      setPhoneError("Enter a valid 10-digit number");
-      return;
-    }
+    if (!digits || digits.length < 10) { setPhoneError("Enter a valid 10-digit number"); return; }
     setPhoneError("");
     setLoading(true);
     setGlobalError("");
@@ -212,40 +181,31 @@ export default function DriverRegisterPage() {
     }
   };
 
-  /* ── step 3: verify OTP → submit ── */
   const handleVerifyAndSubmit = async (otp) => {
     setGlobalError("");
     setLoading(true);
     try {
-      /* 1. verify OTP with MSG91 */
-      const data = await verifyOtp(otp);
+      const data  = await verifyOtp(otp);
       const token = data?.message;
       if (!token) throw new Error("No token returned from OTP verification");
 
-      /* 2. build multipart payload */
       const fd = new FormData();
       fd.append("accessToken", token);
-      fd.append("name", form.name.trim());
+      fd.append("name",          form.name.trim());
       fd.append("vehicleNumber", form.vehicleNumber.trim().toUpperCase());
-      fd.append("vehicleType", form.vehicleType);
+      fd.append("vehicleType",   form.vehicleType);
       if (form.email.trim()) fd.append("email", form.email.trim());
-      fd.append("photo", photo);
+      fd.append("photo",   photo);
       fd.append("license", license);
 
-      /* 3. hit the backend */
-      await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/v1/driver/register`,
-        fd,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
+      await api.post("/api/v1/driver/register", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-      setAccessToken(token);
       setStep(4);
     } catch (err) {
       setGlobalError(
-        err.response?.data?.error ||
-          err.message ||
-          "Verification failed. Please try again.",
+        err.response?.data?.error || err.message || "Verification failed. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -254,93 +214,43 @@ export default function DriverRegisterPage() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden text-slate-300 flex items-center justify-center">
-      {/* background */}
       <div className="absolute inset-0 w-full h-full">
-        <img
-          src={ambulanceimage}
-          className="absolute inset-0 w-full h-full object-cover"
-          alt=""
-        />
+        <img src={ambulanceimage} className="absolute inset-0 w-full h-full object-cover" alt="" />
       </div>
       <div className="absolute inset-0 bg-black/50" />
 
-      {/* content */}
       <div className="relative z-10 w-full flex flex-col items-center justify-center px-4 py-8">
-        {/* header — same as AuthenticationPage */}
         <div className="flex items-center gap-4 w-full justify-center mb-6">
-          <svg
-            className="w-1/3 md:w-1/4"
-            viewBox="0 0 400 200"
-            xmlns="http://www.w3.org/2000/svg"
-          >
+          <svg className="w-1/3 md:w-1/4" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <linearGradient
-                id="ecgL"
-                x1="0"
-                y1="0"
-                x2="190"
-                y2="0"
-                gradientUnits="userSpaceOnUse"
-              >
-                <stop offset="0%" stopColor="#0077b6" stopOpacity="0" />
+              <linearGradient id="ecgL" x1="0" y1="0" x2="190" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#0077b6" stopOpacity="0" />
                 <stop offset="100%" stopColor="#0077b6" stopOpacity="1" />
               </linearGradient>
             </defs>
-            <path
-              d="M10,100L50,100L65,65L75,135L85,100L125,100L140,25L155,175L170,100L210,100L225,80L235,120L245,100L290,100L305,45L325,155L340,100L380,100"
-              fill="none"
-              stroke="url(#ecgL)"
-              strokeWidth="5"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
+            <path d="M10,100L50,100L65,65L75,135L85,100L125,100L140,25L155,175L170,100L210,100L225,80L235,120L245,100L290,100L305,45L325,155L340,100L380,100"
+              fill="none" stroke="url(#ecgL)" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round" />
           </svg>
-
-          <p className="text-xl sm:text-4xl md:text-5xl lg:text-6xl text-slate-100 font-light tracking-wide">
-            ResQRide
-          </p>
-
-          <svg
-            className="w-1/3 md:w-1/4"
-            viewBox="0 0 400 200"
-            xmlns="http://www.w3.org/2000/svg"
-          >
+          <p className="text-xl sm:text-4xl md:text-5xl lg:text-6xl text-slate-100 font-light tracking-wide">ResQRide</p>
+          <svg className="w-1/3 md:w-1/4" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <linearGradient
-                id="ecgR"
-                x1="210"
-                y1="0"
-                x2="400"
-                y2="0"
-                gradientUnits="userSpaceOnUse"
-              >
-                <stop offset="0%" stopColor="#0077b6" stopOpacity="1" />
+              <linearGradient id="ecgR" x1="210" y1="0" x2="400" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#0077b6" stopOpacity="1" />
                 <stop offset="100%" stopColor="#0077b6" stopOpacity="0" />
               </linearGradient>
             </defs>
-            <path
-              d="M10,100L50,100L65,65L75,135L85,100L125,100L140,25L155,175L170,100L210,100L225,80L235,120L245,100L290,100L305,45L325,155L340,100L380,100"
-              fill="none"
-              stroke="url(#ecgR)"
-              strokeWidth="5"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
+            <path d="M10,100L50,100L65,65L75,135L85,100L125,100L140,25L155,175L170,100L210,100L225,80L235,120L245,100L290,100L305,45L325,155L340,100L380,100"
+              fill="none" stroke="url(#ecgR)" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round" />
           </svg>
         </div>
 
-        {/* card */}
         <Card className="w-full max-w-md bg-slate-950/75 backdrop-blur-md text-slate-200 border-slate-800">
           <CardHeader className="pb-0 pt-6 px-6">
             <p className="text-center lg:text-2xl md:text-xl text-base font-medium text-slate-100">
-              {step === 4
-                ? "Registration Submitted"
-                : "Join as Emergency Responder"}
+              {step === 4 ? "Registration Submitted" : "Join as Emergency Responder"}
             </p>
             {step < 4 && (
-              <p className="text-center text-xs text-slate-500 mt-1">
-                Step {step + 1} of {STEPS.length - 1}
-              </p>
+              <p className="text-center text-xs text-slate-500 mt-1">Step {step + 1} of {STEPS.length - 1}</p>
             )}
           </CardHeader>
 
@@ -353,27 +263,12 @@ export default function DriverRegisterPage() {
               <div className="space-y-4">
                 <div>
                   <FieldLabel required>Full Name</FieldLabel>
-                  <FieldInput
-                    type="text"
-                    placeholder="Rahul Sharma"
-                    value={form.name}
-                    onChange={setField("name")}
-                    error={formErrors.name}
-                  />
+                  <FieldInput type="text" placeholder="Rahul Sharma" value={form.name} onChange={setField("name")} error={formErrors.name} />
                 </div>
-
                 <div>
                   <FieldLabel required>Vehicle Number</FieldLabel>
-                  <FieldInput
-                    type="text"
-                    placeholder="MH12AB1234"
-                    value={form.vehicleNumber}
-                    onChange={setField("vehicleNumber")}
-                    error={formErrors.vehicleNumber}
-                    className="uppercase"
-                  />
+                  <FieldInput type="text" placeholder="MH12AB1234" value={form.vehicleNumber} onChange={setField("vehicleNumber")} error={formErrors.vehicleNumber} className="uppercase" />
                 </div>
-
                 <div>
                   <FieldLabel required>Vehicle Type</FieldLabel>
                   <select
@@ -387,85 +282,42 @@ export default function DriverRegisterPage() {
                     <option value="ALS">ALS — Advanced Life Support</option>
                     <option value="Mortuary">Mortuary</option>
                   </select>
-                  {formErrors.vehicleType && (
-                    <p className="text-red-400 text-xs mt-1">
-                      {formErrors.vehicleType}
-                    </p>
-                  )}
+                  {formErrors.vehicleType && <p className="text-red-400 text-xs mt-1">{formErrors.vehicleType}</p>}
                 </div>
-
                 <div>
                   <FieldLabel>Email (optional)</FieldLabel>
-                  <FieldInput
-                    type="email"
-                    placeholder="rahul@example.com"
-                    value={form.email}
-                    onChange={setField("email")}
-                    error={formErrors.email}
-                  />
+                  <FieldInput type="email" placeholder="rahul@example.com" value={form.email} onChange={setField("email")} error={formErrors.email} />
                 </div>
-
-                <Button
-                  onClick={handleDetailsNext}
-                  className="w-full h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100 mt-2"
-                >
+                <Button onClick={handleDetailsNext} className="w-full h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100 mt-2">
                   Continue →
                 </Button>
               </div>
             )}
 
-            {/* ── STEP 1: Documents ── */}
             {step === 1 && (
               <div className="space-y-5">
                 <FileUploadBox
-                  label="Driver Photo"
-                  hint="JPG or PNG · max 5 MB"
-                  accept="image/jpeg,image/png,image/jpg"
+                  label="Driver Photo" hint="JPG or PNG · max 5 MB" accept="image/jpeg,image/png,image/jpg"
                   file={photo}
-                  onChange={(e) => {
-                    setPhoto(e.target.files[0] || null);
-                    setFileErrors((fe) => ({ ...fe, photo: "" }));
-                  }}
+                  onChange={(e) => { setPhoto(e.target.files[0] || null); setFileErrors((fe) => ({ ...fe, photo: "" })); }}
                   error={fileErrors.photo}
                 />
-
                 <FileUploadBox
-                  label="Driver's License"
-                  hint="JPG, PNG or PDF · max 5 MB"
-                  accept="image/jpeg,image/png,image/jpg,application/pdf"
+                  label="Driver's License" hint="JPG, PNG or PDF · max 5 MB" accept="image/jpeg,image/png,image/jpg,application/pdf"
                   file={license}
-                  onChange={(e) => {
-                    setLicense(e.target.files[0] || null);
-                    setFileErrors((fe) => ({ ...fe, license: "" }));
-                  }}
+                  onChange={(e) => { setLicense(e.target.files[0] || null); setFileErrors((fe) => ({ ...fe, license: "" })); }}
                   error={fileErrors.license}
                 />
-
                 <div className="flex gap-3 mt-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setStep(0)}
-                    className="flex-1 h-11 text-slate-400 hover:text-slate-900 border border-slate-700"
-                  >
-                    ← Back
-                  </Button>
-                  <Button
-                    onClick={handleDocumentsNext}
-                    className="flex-1 h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100"
-                  >
-                    Continue →
-                  </Button>
+                  <Button variant="ghost" onClick={() => setStep(0)} className="flex-1 h-11 text-slate-400 hover:text-slate-900 border border-slate-700">← Back</Button>
+                  <Button onClick={handleDocumentsNext} className="flex-1 h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100">Continue →</Button>
                 </div>
               </div>
             )}
 
-            {/* ── STEP 2: Phone ── */}
             {step === 2 && (
               <div className="space-y-4">
-                {sdkError && (
-                  <p className="text-red-400 text-sm text-center">{sdkError}</p>
-                )}
-
+                {sdkError && <p className="text-red-400 text-sm text-center">{sdkError}</p>}
                 <div>
                   <FieldLabel required>Phone Number</FieldLabel>
                   <div className="flex items-center border-b-2 border-b-[#00B4D8] pb-1 gap-2">
@@ -474,158 +326,78 @@ export default function DriverRegisterPage() {
                       <span className="text-slate-300 font-semibold">+91</span>
                     </div>
                     <input
-                      type="tel"
-                      inputMode="numeric"
-                      value={digits}
+                      type="tel" inputMode="numeric" value={digits} placeholder="98765 43210" maxLength={10}
                       onChange={(e) => {
-                        const d = e.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 10);
+                        const d = e.target.value.replace(/\D/g, "").slice(0, 10);
                         setPhone("+91" + d);
                         if (phoneError) setPhoneError("");
                       }}
-                      placeholder="98765 43210"
-                      maxLength={10}
-                      className="flex-1 bg-transparent outline-none pt-3 text-slate-100
-                        placeholder-slate-500 font-medium tracking-widest caret-blue-400"
+                      className="flex-1 bg-transparent outline-none pt-3 text-slate-100 placeholder-slate-500 font-medium tracking-widest caret-blue-400"
                     />
                     {digits.length > 0 && (
-                      <span
-                        className={`text-xs font-mono shrink-0 transition-colors
-                        ${digits.length === 10 ? "text-emerald-400" : "text-slate-500"}`}
-                      >
+                      <span className={`text-xs font-mono shrink-0 transition-colors ${digits.length === 10 ? "text-emerald-400" : "text-slate-500"}`}>
                         {digits.length}/10
                       </span>
                     )}
                   </div>
-                  {phoneError && (
-                    <p className="text-red-400 text-xs mt-1">{phoneError}</p>
-                  )}
+                  {phoneError && <p className="text-red-400 text-xs mt-1">{phoneError}</p>}
                 </div>
-
                 <div className="flex gap-3 mt-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setStep(1)}
-                    className="flex-1 h-11 text-slate-400 hover:text-slate-900 border border-slate-700"
-                  >
-                    ← Back
-                  </Button>
-                  <Button
-                    onClick={handleSendOtp}
-                    disabled={loading || !sdkReady || digits.length !== 10}
-                    className="flex-1 h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100"
-                  >
-                    {loading
-                      ? "Sending..."
-                      : !sdkReady
-                        ? "Loading..."
-                        : "Send OTP"}
+                  <Button variant="ghost" onClick={() => setStep(1)} className="flex-1 h-11 text-slate-400 hover:text-slate-900 border border-slate-700">← Back</Button>
+                  <Button onClick={handleSendOtp} disabled={loading || !sdkReady || digits.length !== 10} className="flex-1 h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100">
+                    {loading ? "Sending..." : !sdkReady ? "Loading..." : "Send OTP"}
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* ── STEP 3: OTP ── */}
             {step === 3 && (
               <div className="space-y-5">
                 <p className="text-center text-sm text-slate-400">
-                  Enter the 6-digit code sent to{" "}
-                  <span className="text-slate-200 font-medium">{phone}</span>
+                  Enter the 6-digit code sent to <span className="text-slate-200 font-medium">{phone}</span>
                 </p>
-
                 <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    onComplete={handleVerifyAndSubmit}
-                    disabled={loading}
-                  >
+                  <InputOTP maxLength={6} onComplete={handleVerifyAndSubmit} disabled={loading}>
                     <InputOTPGroup>
-                      {[0, 1, 2, 3, 4, 5].map((i) => (
-                        <InputOTPSlot key={i} index={i} />
-                      ))}
+                      {[0, 1, 2, 3, 4, 5].map((i) => <InputOTPSlot key={i} index={i} />)}
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
-
-                {loading && (
-                  <p className="text-center text-sm text-slate-400 animate-pulse">
-                    Verifying and submitting…
-                  </p>
-                )}
-
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  disabled={resendCount >= 2 || resendTimer > 0 || loading}
-                  onClick={handleResend}
-                >
-                  {resendCount >= 2
-                    ? "Resend limit reached"
-                    : resendTimer > 0
-                      ? `Resend in ${resendTimer}s`
-                      : `Resend OTP (${2 - resendCount} left)`}
+                {loading && <p className="text-center text-sm text-slate-400 animate-pulse">Verifying and submitting…</p>}
+                <Button variant="ghost" className="w-full" disabled={resendCount >= 2 || resendTimer > 0 || loading} onClick={handleResend}>
+                  {resendCount >= 2 ? "Resend limit reached" : resendTimer > 0 ? `Resend in ${resendTimer}s` : `Resend OTP (${2 - resendCount} left)`}
                 </Button>
-
-                <Button
-                  variant="ghost"
-                  onClick={() => setStep(2)}
-                  className="w-full text-slate-500 hover:text-slate-300 text-xs"
-                >
+                <Button variant="ghost" onClick={() => setStep(2)} className="w-full text-slate-500 hover:text-slate-300 text-xs">
                   ← Change phone number
                 </Button>
               </div>
             )}
 
-            {/* ── STEP 4: Success ── */}
             {step === 4 && (
               <div className="flex flex-col items-center gap-5 py-2">
-                <div
-                  className="w-16 h-16 rounded-full bg-[#0077B6]/20 border-2 border-[#00B4D8]/50
-                  flex items-center justify-center"
-                >
+                <div className="w-16 h-16 rounded-full bg-[#0077B6]/20 border-2 border-[#00B4D8]/50 flex items-center justify-center">
                   <span className="text-3xl">✓</span>
                 </div>
-
                 <div className="text-center space-y-2">
-                  <p className="text-slate-100 font-medium text-base">
-                    Your application is under review
-                  </p>
+                  <p className="text-slate-100 font-medium text-base">Your application is under review</p>
                   <p className="text-slate-400 text-sm leading-relaxed">
-                    We've received your registration. Our team will verify your
-                    documents and approve your account. You'll be able to log in
-                    once approved.
+                    We've received your registration. Our team will verify your documents and approve your account.
                   </p>
                 </div>
-
                 <div className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 space-y-1.5">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">
-                    Submitted details
-                  </p>
-                  <p className="text-sm text-slate-300">
-                    <span className="text-slate-500">Name: </span>
-                    {form.name}
-                  </p>
-                  <p className="text-sm text-slate-300">
-                    <span className="text-slate-500">Vehicle: </span>
-                    {form.vehicleNumber.toUpperCase()} · {form.vehicleType}
-                  </p>
-                  <p className="text-sm text-slate-300">
-                    <span className="text-slate-500">Phone: </span>
-                    {phone}
-                  </p>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider">Submitted details</p>
+                  <p className="text-sm text-slate-300"><span className="text-slate-500">Name: </span>{form.name}</p>
+                  <p className="text-sm text-slate-300"><span className="text-slate-500">Vehicle: </span>{form.vehicleNumber.toUpperCase()} · {form.vehicleType}</p>
+                  <p className="text-sm text-slate-300"><span className="text-slate-500">Phone: </span>{phone}</p>
                 </div>
-
-                <Button
-                  onClick={() => navigate("/")}
-                  className="w-full h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100"
-                >
+                <Button onClick={() => navigate("/")} className="w-full h-11 bg-[#0077B6] hover:bg-[#00B4D8] text-slate-100">
                   Back to Login
                 </Button>
               </div>
             )}
 
-            {/* footer link — only on non-done steps */}
+            {globalError && <p className="text-red-400 text-sm text-center mt-3">{globalError}</p>}
+
             {step < 4 && (
               <>
                 <div className="flex items-center my-4">
@@ -635,9 +407,7 @@ export default function DriverRegisterPage() {
                 </div>
                 <p className="text-center lg:text-base md:text-sm text-xs text-slate-400">
                   Already approved?{" "}
-                  <Link to="/" className="text-[#0077B6] hover:text-[#00B4D8]">
-                    Log in here
-                  </Link>
+                  <Link to="/" className="text-[#0077B6] hover:text-[#00B4D8]">Log in here</Link>
                 </p>
               </>
             )}

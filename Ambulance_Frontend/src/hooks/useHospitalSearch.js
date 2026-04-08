@@ -1,16 +1,6 @@
-// src/hooks/useHospitalSearch.js
-// Hospital-only search for the DROP field.
-// FIXES:
-//  1. Removed User-Agent header — browsers block it (causes console error)
-//  2. Removed bounded=1 — allows partial name matching ("bhakti" → "Bhaktivedanta Hospital")
-//     viewbox is now a ranking bias only, not a hard filter
-//  3. Added haversine post-filter to cap results at MAX_RADIUS_KM (~12 km)
-//  4. Reduced viewbox to d=0.09 (~10 km) to keep bias tight
-
 import { useState, useCallback, useRef } from "react";
 import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import api from "@/lib/api";
 
 const MAX_RADIUS_KM = 12;
 
@@ -25,7 +15,6 @@ const MEDICAL_KEYWORDS = [
 const isMedical = (name = "") =>
   MEDICAL_KEYWORDS.some((kw) => name.toLowerCase().includes(kw));
 
-// Haversine distance in km
 const haversineKm = (lat1, lng1, lat2, lng2) => {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -38,15 +27,15 @@ const haversineKm = (lat1, lng1, lat2, lng2) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+const withinRadius = (userCoords) => (r) =>
+  haversineKm(userCoords.lat, userCoords.lng, r.lat, r.lng) <= MAX_RADIUS_KM;
+
 const searchMapplsHospitals = async (query, userCoords) => {
-  const { data } = await axios.get(`${API_URL}/api/v1/places/hospitals`, {
+  const { data } = await api.get("/api/v1/places/hospitals", {
     params: { query, lat: userCoords.lat, lng: userCoords.lng },
   });
 
-  const places = data?.suggestedLocations ?? [];
-  if (!places.length) return [];
-
-  return places
+  return (data?.suggestedLocations ?? [])
     .filter((r) => isMedical(r.placeName))
     .map((r) => {
       const t = r.addressTokens ?? {};
@@ -62,36 +51,25 @@ const searchMapplsHospitals = async (query, userCoords) => {
         lng:          parseFloat(r.longitude),
       };
     })
-    .filter(
-      (r) => haversineKm(userCoords.lat, userCoords.lng, r.lat, r.lng) <= MAX_RADIUS_KM
-    );
+    .filter(withinRadius(userCoords));
 };
 
-// FIX: removed bounded=1 so partial names like "bhakti" can match
-// "Bhaktivedanta Hospital". viewbox is now a ranking bias only.
-// FIX: removed User-Agent header — browsers block it as an unsafe header.
-// FIX: added haversine post-filter to enforce MAX_RADIUS_KM hard cap.
 const searchNominatimHospitals = async (query, userCoords) => {
-  const d = 0.09; // ~10 km as ranking bias
-  const { data } = await axios.get(
-    "https://nominatim.openstreetmap.org/search",
-    {
-      params: {
-        q:              query,
-        format:         "json",
-        limit:          15,
-        countrycodes:   "in",
-        addressdetails: 1,
-        dedupe:         1,
-        // No bounded=1 — viewbox is a bias only so partial names still match
-        viewbox: `${userCoords.lng - d},${userCoords.lat + d},${userCoords.lng + d},${userCoords.lat - d}`,
-      },
-      // NOTE: Do NOT set User-Agent here — browsers reject it as an unsafe header
-    }
-  );
+  const d = 0.09;
+  const { data } = await axios.get("https://nominatim.openstreetmap.org/search", {
+    params: {
+      q:              query,
+      format:         "json",
+      limit:          15,
+      countrycodes:   "in",
+      addressdetails: 1,
+      dedupe:         1,
+      viewbox: `${userCoords.lng - d},${userCoords.lat + d},${userCoords.lng + d},${userCoords.lat - d}`,
+    },
+  });
 
-  const queryLower = query.toLowerCase();
-  const queryIsMedical = MEDICAL_KEYWORDS.some((kw) => queryLower.includes(kw));
+  const queryLower      = query.toLowerCase();
+  const queryIsMedical  = MEDICAL_KEYWORDS.some((kw) => queryLower.includes(kw));
 
   return data
     .filter((r) => {
@@ -120,10 +98,7 @@ const searchNominatimHospitals = async (query, userCoords) => {
         lng:          parseFloat(r.lon),
       };
     })
-    // Hard cap: only show results within MAX_RADIUS_KM of the user
-    .filter(
-      (r) => haversineKm(userCoords.lat, userCoords.lng, r.lat, r.lng) <= MAX_RADIUS_KM
-    );
+    .filter(withinRadius(userCoords));
 };
 
 const useHospitalSearch = (userCoords = null) => {
@@ -148,8 +123,8 @@ const useHospitalSearch = (userCoords = null) => {
       timer.current = setTimeout(async () => {
         setLoading(true);
         try {
-          const results = await searchMapplsHospitals(query, userCoords);
-          if (results.length) { setResults(results); return; }
+          const res = await searchMapplsHospitals(query, userCoords);
+          if (res.length) { setResults(res); return; }
           setResults(await searchNominatimHospitals(query, userCoords));
         } catch {
           try   { setResults(await searchNominatimHospitals(query, userCoords)); }
