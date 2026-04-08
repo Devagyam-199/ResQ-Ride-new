@@ -1,3 +1,4 @@
+=
 import { useState, useCallback, useRef } from "react";
 import axios from "axios";
 
@@ -44,7 +45,7 @@ const searchNominatim = async (query, userCoords) => {
         viewbox:        `${userCoords.lng - d},${userCoords.lat + d},${userCoords.lng + d},${userCoords.lat - d}`,
         bounded:        1,
       },
-      headers: { "User-Agent": "ResQRide/1.0 (contact@resqride.in)" },
+      // NOTE: Do NOT set User-Agent — browsers block it as an unsafe header
     }
   );
 

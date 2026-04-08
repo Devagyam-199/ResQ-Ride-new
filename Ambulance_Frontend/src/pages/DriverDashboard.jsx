@@ -41,6 +41,16 @@ const BOOKING_TYPE_LABELS = {
   },
 };
 
+// ── Persistence helpers ────────────────────────────────────────────────────
+// We use sessionStorage (tab-scoped) so the driver is restored as online
+// after a refresh/bad-connection reload, but not if they open a new tab
+// after a deliberate logout.
+const ONLINE_KEY = "driver_was_online";
+
+const markOnline  = () => sessionStorage.setItem(ONLINE_KEY, "1");
+const markOffline = () => sessionStorage.removeItem(ONLINE_KEY);
+const wasOnline   = () => sessionStorage.getItem(ONLINE_KEY) === "1";
+
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 const OnlineToggle = ({ isOnline, onToggle, loading }) => (
@@ -115,7 +125,6 @@ const BookingRequestModal = ({ request, onAccept, onReject }) => {
     BOOKING_TYPE_LABELS[request.bookingType] ?? BOOKING_TYPE_LABELS.Basic;
 
   return (
-    /* faux viewport so position:fixed doesn't collapse iframe */
     <div
       style={{
         position: "absolute",
@@ -321,8 +330,8 @@ const DriverDashboard = () => {
   const { socket, connected, emit, on } = useSocket(token);
   const navigate = useNavigate();
 
-  // Driver state
-  const [isOnline, setIsOnline] = useState(false);
+  // Initialise isOnline from sessionStorage so a refresh doesn't drop offline
+  const [isOnline, setIsOnline] = useState(() => wasOnline());
   const [onlineLoading, setOnlineLoading] = useState(false);
   const [driverCoords, setDriverCoords] = useState(null);
 
@@ -330,10 +339,10 @@ const DriverDashboard = () => {
   const [incomingRequest, setIncomingRequest] = useState(null);
 
   // Active booking
-  const [activeBooking, setActiveBooking] = useState(null); // { bookingId, pickup, drop, fare, bookingType }
-  const [bookingStatus, setBookingStatus] = useState(null); // "Confirmed" | "En-Route" | "Arrived" | "Completed"
+  const [activeBooking, setActiveBooking] = useState(null);
+  const [bookingStatus, setBookingStatus] = useState(null);
 
-  // Session stats (in-memory, resets on refresh)
+  // Session stats (in-memory, resets on refresh intentionally)
   const [stats, setStats] = useState({ trips: 0, earned: 0 });
 
   // Location watch ref
@@ -344,22 +353,20 @@ const DriverDashboard = () => {
   const startLocationWatch = useCallback(() => {
     if (!navigator.geolocation) return;
 
-    // Immediately get position
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude: lat, longitude: long } = pos.coords;
-        setDriverCoords({ lat, long });
-        emit("driver_online", { lat, lng: long });
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setDriverCoords({ lat, lng });
+        emit("driver_online", { lat, lng });
       },
       (err) => console.warn("GPS error:", err),
       { enableHighAccuracy: true, timeout: 10_000 },
     );
 
-    // Continuous watch
     watchRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        const { latitude: lat, longitude: long } = pos.coords;
-        setDriverCoords({ lat, long });
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setDriverCoords({ lat, lng });
       },
       (err) => console.warn("GPS watch error:", err),
       { enableHighAccuracy: true, maximumAge: 5000 },
@@ -374,6 +381,15 @@ const DriverDashboard = () => {
     clearInterval(locationIntervalRef.current);
   }, []);
 
+  // ── Restore online state after a page refresh ────────────────────────────
+  // When the socket reconnects and the driver was previously online,
+  // re-emit driver_online with current GPS position.
+  useEffect(() => {
+    if (!connected || !isOnline) return;
+    // Socket just (re)connected while we're supposed to be online — start GPS
+    startLocationWatch();
+  }, [connected]); // intentionally only on connected changes
+
   // ── Send location updates to socket while on active booking ─────────────
   useEffect(() => {
     clearInterval(locationIntervalRef.current);
@@ -381,7 +397,7 @@ const DriverDashboard = () => {
     locationIntervalRef.current = setInterval(() => {
       emit("location_update", {
         lat: driverCoords.lat,
-        lng: driverCoords.long,
+        lng: driverCoords.lng,
         bookingId: activeBooking.bookingId,
       });
     }, 5000);
@@ -396,10 +412,12 @@ const DriverDashboard = () => {
       if (isOnline) {
         stopLocationWatch();
         emit("driver_offline");
+        markOffline();
         setIsOnline(false);
         setDriverCoords(null);
       } else {
         startLocationWatch();
+        markOnline();
         setIsOnline(true);
       }
     } finally {
@@ -412,7 +430,6 @@ const DriverDashboard = () => {
     if (!socket) return;
 
     const offNewBooking = on("new_booking_request", (data) => {
-      // Only show if no active booking
       setIncomingRequest((prev) => (prev ? prev : data));
     });
 
@@ -423,7 +440,6 @@ const DriverDashboard = () => {
     });
 
     const offBookingCancelled = on("booking_cancelled", ({ bookingId }) => {
-      // If it's the one we're on, clear it
       setActiveBooking((prev) => {
         if (prev?.bookingId === bookingId) {
           setBookingStatus(null);
@@ -481,7 +497,6 @@ const DriverDashboard = () => {
           trips: s.trips + 1,
           earned: s.earned + (activeBooking.fare ?? 0),
         }));
-        // Clear active booking after a short delay so "Completed" renders
         setTimeout(() => {
           setActiveBooking(null);
           setBookingStatus(null);
@@ -503,6 +518,7 @@ const DriverDashboard = () => {
   const handleLogout = () => {
     stopLocationWatch();
     if (isOnline) emit("driver_offline");
+    markOffline(); // clear persistence on intentional logout
     logout();
     navigate("/");
   };
@@ -521,7 +537,7 @@ const DriverDashboard = () => {
       : null;
 
   const mapUserLocation = driverCoords
-    ? [driverCoords.lat, driverCoords.long]
+    ? [driverCoords.lat, driverCoords.lng]
     : null;
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -622,7 +638,7 @@ const DriverDashboard = () => {
                 {driverCoords && (
                   <p className="text-slate-600 text-xs">
                     GPS active · {driverCoords.lat.toFixed(4)},{" "}
-                    {driverCoords.long.toFixed(4)}
+                    {driverCoords.lng.toFixed(4)}
                   </p>
                 )}
               </div>

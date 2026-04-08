@@ -1,13 +1,18 @@
 // src/hooks/useHospitalSearch.js
 // Hospital-only search for the DROP field.
-// FIX: loosened Nominatim fallback filter so it returns results even when
-//      OSM doesn't tag the amenity type precisely. The old strict filter
-//      caused zero results after Mappls proxy failed in production.
+// FIXES:
+//  1. Removed User-Agent header — browsers block it (causes console error)
+//  2. Removed bounded=1 — allows partial name matching ("bhakti" → "Bhaktivedanta Hospital")
+//     viewbox is now a ranking bias only, not a hard filter
+//  3. Added haversine post-filter to cap results at MAX_RADIUS_KM (~12 km)
+//  4. Reduced viewbox to d=0.09 (~10 km) to keep bias tight
 
 import { useState, useCallback, useRef } from "react";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL;
+
+const MAX_RADIUS_KM = 12;
 
 const MEDICAL_KEYWORDS = [
   "hospital", "clinic", "medical", "health", "nursing",
@@ -19,6 +24,19 @@ const MEDICAL_KEYWORDS = [
 
 const isMedical = (name = "") =>
   MEDICAL_KEYWORDS.some((kw) => name.toLowerCase().includes(kw));
+
+// Haversine distance in km
+const haversineKm = (lat1, lng1, lat2, lng2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
 const searchMapplsHospitals = async (query, userCoords) => {
   const { data } = await axios.get(`${API_URL}/api/v1/places/hospitals`, {
@@ -43,34 +61,35 @@ const searchMapplsHospitals = async (query, userCoords) => {
         lat:          parseFloat(r.latitude),
         lng:          parseFloat(r.longitude),
       };
-    });
+    })
+    .filter(
+      (r) => haversineKm(userCoords.lat, userCoords.lng, r.lat, r.lng) <= MAX_RADIUS_KM
+    );
 };
 
-// FIX: relaxed filter — previously required exact OSM amenity type match.
-// Now accepts any result whose display_name contains a medical keyword,
-// which handles hospitals tagged as "building", "place", etc. in OSM.
+// FIX: removed bounded=1 so partial names like "bhakti" can match
+// "Bhaktivedanta Hospital". viewbox is now a ranking bias only.
+// FIX: removed User-Agent header — browsers block it as an unsafe header.
+// FIX: added haversine post-filter to enforce MAX_RADIUS_KM hard cap.
 const searchNominatimHospitals = async (query, userCoords) => {
-  const d = 0.135;
+  const d = 0.09; // ~10 km as ranking bias
   const { data } = await axios.get(
     "https://nominatim.openstreetmap.org/search",
     {
       params: {
         q:              query,
         format:         "json",
-        limit:          10,
+        limit:          15,
         countrycodes:   "in",
         addressdetails: 1,
         dedupe:         1,
-        viewbox:        `${userCoords.lng - d},${userCoords.lat + d},${userCoords.lng + d},${userCoords.lat - d}`,
-        bounded:        1,
+        // No bounded=1 — viewbox is a bias only so partial names still match
+        viewbox: `${userCoords.lng - d},${userCoords.lat + d},${userCoords.lng + d},${userCoords.lat - d}`,
       },
-      headers: { "User-Agent": "ResQRide/1.0 (contact@resqride.in)" },
+      // NOTE: Do NOT set User-Agent here — browsers reject it as an unsafe header
     }
   );
 
-  // FIX: if the user typed a name, trust their intent. Filter loosely:
-  // accept if OSM amenity suggests medical OR the name matches a keyword
-  // OR the query itself is a known medical keyword (user typed "hospital").
   const queryLower = query.toLowerCase();
   const queryIsMedical = MEDICAL_KEYWORDS.some((kw) => queryLower.includes(kw));
 
@@ -85,7 +104,6 @@ const searchNominatimHospitals = async (query, userCoords) => {
         amenity === "pharmacy"     ||
         amenity === "nursing_home" ||
         amenity === "healthcare";
-      // If query was "hospital" / "clinic" etc., include all results
       return isMedAmenity || isMedical(name) || queryIsMedical;
     })
     .map((r) => {
@@ -101,7 +119,11 @@ const searchNominatimHospitals = async (query, userCoords) => {
         lat:          parseFloat(r.lat),
         lng:          parseFloat(r.lon),
       };
-    });
+    })
+    // Hard cap: only show results within MAX_RADIUS_KM of the user
+    .filter(
+      (r) => haversineKm(userCoords.lat, userCoords.lng, r.lat, r.lng) <= MAX_RADIUS_KM
+    );
 };
 
 const useHospitalSearch = (userCoords = null) => {
@@ -113,7 +135,7 @@ const useHospitalSearch = (userCoords = null) => {
   const search = useCallback(
     (query) => {
       clearTimeout(timer.current);
-      if (!query || query.trim().length < 3) { setResults([]); return; }
+      if (!query || query.trim().length < 2) { setResults([]); return; }
 
       if (!userCoords) {
         setNeedsLocation(true);
