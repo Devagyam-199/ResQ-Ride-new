@@ -11,9 +11,10 @@ const reverseGeocode = async (lat, long) => {
       {
         params: { lat, lon: long, format: "json" },
         headers: nominatimHeaders,
+        timeout: 3000,
       },
     );
-    return data.display_name ?? `${lat} , ${long}`;
+    return data.display_name ?? `${lat}, ${long}`;
   } catch {
     return `${lat}, ${long}`;
   }
@@ -32,6 +33,7 @@ const forwardGeocode = async (address) => {
           addressdetails: 1,
         },
         headers: nominatimHeaders,
+        timeout: 3000, // FIX: fail fast
       },
     );
     return data.map((r) => ({

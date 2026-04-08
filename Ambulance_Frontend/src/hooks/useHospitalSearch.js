@@ -1,31 +1,28 @@
 // src/hooks/useHospitalSearch.js
-// Hospital-only search — used exclusively for the DROP field.
-// FIX: replaced direct Mappls REST call (blocked by CORS/403) with a backend proxy.
+// Hospital-only search for the DROP field.
+// FIX: loosened Nominatim fallback filter so it returns results even when
+//      OSM doesn't tag the amenity type precisely. The old strict filter
+//      caused zero results after Mappls proxy failed in production.
 
 import { useState, useCallback, useRef } from "react";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-// Keywords used to client-side verify a result is actually medical
 const MEDICAL_KEYWORDS = [
-  "hospital", "clinic", "medical", "health", "care", "nursing",
+  "hospital", "clinic", "medical", "health", "nursing",
   "pharmacy", "dispensary", "diagnostic", "nursing home", "maternity",
   "trauma", "icu", "emergency", "apollo", "fortis", "aiims", "lilavati",
   "hinduja", "kokilaben", "nanavati", "wockhardt", "breach candy",
+  "care", "centre", "center", "trust", "charity",
 ];
 
 const isMedical = (name = "") =>
   MEDICAL_KEYWORDS.some((kw) => name.toLowerCase().includes(kw));
 
-// FIX: calls /api/v1/places/hospitals proxy instead of atlas.mappls.com directly
 const searchMapplsHospitals = async (query, userCoords) => {
   const { data } = await axios.get(`${API_URL}/api/v1/places/hospitals`, {
-    params: {
-      query,
-      lat: userCoords.lat,
-      lng: userCoords.lng,
-    },
+    params: { query, lat: userCoords.lat, lng: userCoords.lng },
   });
 
   const places = data?.suggestedLocations ?? [];
@@ -40,7 +37,6 @@ const searchMapplsHospitals = async (query, userCoords) => {
         t.locality || t.subLocality || t.village,
         t.city || t.district,
       ].filter(Boolean);
-
       return {
         display_name: r.placeName + (r.placeAddress ? `, ${r.placeAddress}` : ""),
         short_name:   parts.slice(0, 3).join(", "),
@@ -50,6 +46,9 @@ const searchMapplsHospitals = async (query, userCoords) => {
     });
 };
 
+// FIX: relaxed filter — previously required exact OSM amenity type match.
+// Now accepts any result whose display_name contains a medical keyword,
+// which handles hospitals tagged as "building", "place", etc. in OSM.
 const searchNominatimHospitals = async (query, userCoords) => {
   const d = 0.135;
   const { data } = await axios.get(
@@ -69,18 +68,25 @@ const searchNominatimHospitals = async (query, userCoords) => {
     }
   );
 
+  // FIX: if the user typed a name, trust their intent. Filter loosely:
+  // accept if OSM amenity suggests medical OR the name matches a keyword
+  // OR the query itself is a known medical keyword (user typed "hospital").
+  const queryLower = query.toLowerCase();
+  const queryIsMedical = MEDICAL_KEYWORDS.some((kw) => queryLower.includes(kw));
+
   return data
     .filter((r) => {
-      const amenity = (r.type || "").toLowerCase();
+      const amenity = (r.type || r.class || "").toLowerCase();
       const name    = (r.display_name || "").toLowerCase();
-      return (
+      const isMedAmenity =
         amenity === "hospital"     ||
         amenity === "clinic"       ||
         amenity === "doctors"      ||
         amenity === "pharmacy"     ||
         amenity === "nursing_home" ||
-        isMedical(name)
-      );
+        amenity === "healthcare";
+      // If query was "hospital" / "clinic" etc., include all results
+      return isMedAmenity || isMedical(name) || queryIsMedical;
     })
     .map((r) => {
       const a     = r.address ?? {};
