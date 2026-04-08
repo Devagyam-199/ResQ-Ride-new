@@ -24,6 +24,9 @@ import bookingRoute from "./Routes/booking.routes.js";
 app.use("/api/v1/booking", bookingRoute);
 app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
 
+import placesRouter from "./Routes/places.routes.js";
+app.use("/api/v1/places", placesRouter);
+
 /************************** last line of code **************************/
 
 app.use(globalError);

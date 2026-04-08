@@ -1,14 +1,11 @@
 // src/hooks/useHospitalSearch.js
 // Hospital-only search — used exclusively for the DROP field.
-// Filters by medical category (HOSP, MEDC) and hard-restricts to ~15 km.
+// FIX: replaced direct Mappls REST call (blocked by CORS/403) with a backend proxy.
 
 import { useState, useCallback, useRef } from "react";
 import axios from "axios";
 
-const REST_KEY = import.meta.env.VITE_MAPPLS_REST_KEY;
-
-// Mappls category codes for medical facilities
-const MEDICAL_FILTER = "cop:HOSP,cop:MEDC,cop:CLINIC,cop:NRSG";
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Keywords used to client-side verify a result is actually medical
 const MEDICAL_KEYWORDS = [
@@ -21,28 +18,21 @@ const MEDICAL_KEYWORDS = [
 const isMedical = (name = "") =>
   MEDICAL_KEYWORDS.some((kw) => name.toLowerCase().includes(kw));
 
+// FIX: calls /api/v1/places/hospitals proxy instead of atlas.mappls.com directly
 const searchMapplsHospitals = async (query, userCoords) => {
-  const { data } = await axios.get(
-    "https://atlas.mappls.com/api/places/search/json",
-    {
-      params: {
-        query,
-        rest_key: REST_KEY,
-        region:   "IND",
-        pod:      "SLC",           // sub-locality — keeps results local
-        bridge:   true,
-        filter:   MEDICAL_FILTER,  // only medical category POIs
-        location: `${userCoords.lat},${userCoords.lng}`,
-        zoom:     14,              // ~10–15 km radius
-      },
-    }
-  );
+  const { data } = await axios.get(`${API_URL}/api/v1/places/hospitals`, {
+    params: {
+      query,
+      lat: userCoords.lat,
+      lng: userCoords.lng,
+    },
+  });
 
   const places = data?.suggestedLocations ?? [];
   if (!places.length) return [];
 
   return places
-    .filter((r) => isMedical(r.placeName))   // double-check client side
+    .filter((r) => isMedical(r.placeName))
     .map((r) => {
       const t = r.addressTokens ?? {};
       const parts = [
@@ -61,7 +51,7 @@ const searchMapplsHospitals = async (query, userCoords) => {
 };
 
 const searchNominatimHospitals = async (query, userCoords) => {
-  const d = 0.135; // ~15 km bounding box
+  const d = 0.135;
   const { data } = await axios.get(
     "https://nominatim.openstreetmap.org/search",
     {
@@ -81,15 +71,14 @@ const searchNominatimHospitals = async (query, userCoords) => {
 
   return data
     .filter((r) => {
-      // Keep only OSM nodes tagged as medical/hospital amenities
       const amenity = (r.type || "").toLowerCase();
       const name    = (r.display_name || "").toLowerCase();
       return (
-        amenity === "hospital"    ||
-        amenity === "clinic"      ||
-        amenity === "doctors"     ||
-        amenity === "pharmacy"    ||
-        amenity === "nursing_home"||
+        amenity === "hospital"     ||
+        amenity === "clinic"       ||
+        amenity === "doctors"      ||
+        amenity === "pharmacy"     ||
+        amenity === "nursing_home" ||
         isMedical(name)
       );
     })
@@ -109,12 +98,6 @@ const searchNominatimHospitals = async (query, userCoords) => {
     });
 };
 
-/**
- * Hospital-only geocoding hook for the drop location field.
- * @param {Object|null} userCoords — { lat, lng }. Search is blocked until provided.
- * @returns {{ search, results, loading, clear, needsLocation }}
- *   needsLocation is true when the user hasn't shared GPS yet.
- */
 const useHospitalSearch = (userCoords = null) => {
   const [results,       setResults]       = useState([]);
   const [loading,       setLoading]       = useState(false);
@@ -126,7 +109,6 @@ const useHospitalSearch = (userCoords = null) => {
       clearTimeout(timer.current);
       if (!query || query.trim().length < 3) { setResults([]); return; }
 
-      // Hard block — hospital search without location is useless
       if (!userCoords) {
         setNeedsLocation(true);
         setResults([]);
@@ -140,7 +122,6 @@ const useHospitalSearch = (userCoords = null) => {
         try {
           const results = await searchMapplsHospitals(query, userCoords);
           if (results.length) { setResults(results); return; }
-          // Fallback: Nominatim with medical filter
           setResults(await searchNominatimHospitals(query, userCoords));
         } catch {
           try   { setResults(await searchNominatimHospitals(query, userCoords)); }

@@ -1,23 +1,16 @@
 import { useState, useCallback, useRef } from "react";
 import axios from "axios";
 
-const REST_KEY = import.meta.env.VITE_MAPPLS_REST_KEY;
+const API_URL = import.meta.env.VITE_API_URL;
 
 const searchMappls = async (query, userCoords) => {
-  const { data } = await axios.get(
-    "https://atlas.mappls.com/api/places/search/json",
-    {
-      params: {
-        query,
-        rest_key: REST_KEY,
-        region:   "IND",
-        pod:      "SLC",
-        bridge:   true,
-        location: `${userCoords.lat},${userCoords.lng}`,
-        zoom:     14,
-      },
-    }
-  );
+  const { data } = await axios.get(`${API_URL}/api/v1/places/search`, {
+    params: {
+      query,
+      lat: userCoords.lat,
+      lng: userCoords.lng,
+    },
+  });
 
   return (data?.suggestedLocations ?? []).map((r) => {
     const t = r.addressTokens ?? {};

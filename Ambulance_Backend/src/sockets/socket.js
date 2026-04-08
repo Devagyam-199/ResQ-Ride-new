@@ -30,18 +30,19 @@ const initSocket = (server) => {
     socket.join(String(userId));
     console.log(`[socket] ${role} ${userId} connected`);
 
-    socket.on("driver_online", async ({ lat, long }) => {
+    // FIX: was destructuring { lat, long } — frontend emits { lat, lng }
+    socket.on("driver_online", async ({ lat, lng }) => {
       try {
         await Driver.findByIdAndUpdate(userId, {
           isAvailable: true,
           isOnline: true,
           location: {
             type: "Point",
-            coordinates: [long, lat],
+            coordinates: [lng, lat], // MongoDB: [longitude, latitude]
           },
         });
         socket.join("driver_pool");
-        console.log(`[socket] driver ${userId} went online at [${lat},${long}]`);
+        console.log(`[socket] driver ${userId} went online at [${lat},${lng}]`);
       } catch (error) {
         console.error(`[socket] driver_online error: ${error.message}`);
       }
@@ -59,20 +60,22 @@ const initSocket = (server) => {
       }
     });
 
-    socket.on("location_update", async ({ lat, long, bookingId }) => {
+    // FIX: was destructuring { lat, long, bookingId } — frontend emits { lat, lng, bookingId }
+    socket.on("location_update", async ({ lat, lng, bookingId }) => {
       try {
         await Driver.findByIdAndUpdate(userId, {
           location: {
             type: "Point",
-            coordinates: [long, lat],
+            coordinates: [lng, lat],
           },
         });
         if (bookingId) {
           const booking = await Booking.findById(bookingId).select("user");
           if (booking) {
+            // FIX: was emitting { lat, long } — frontend reads { lat, lng }
             io.to(String(booking.user)).emit("driver_location", {
               lat,
-              long,
+              lng,
               bookingId,
             });
           }
@@ -100,6 +103,7 @@ const initSocket = (server) => {
           "name phoneNumber vehicleNumber vehicleType driverPhoto location",
         );
 
+        // FIX: was emitting { lat, long } — frontend reads { lat, lng }
         io.to(String(booking.user)).emit("booking_confirmed", {
           bookingId,
           driver: {
@@ -110,7 +114,7 @@ const initSocket = (server) => {
             vehicleType: driver.vehicleType,
             photo: driver.driverPhoto?.secure_url ?? null,
             lat: driver.location.coordinates[1],
-            long: driver.location.coordinates[0],
+            lng: driver.location.coordinates[0], // FIX: was "long"
           },
         });
 
@@ -176,6 +180,7 @@ const initSocket = (server) => {
         console.error("[socket] booking_cancellation:", err.message);
       }
     });
+
     socket.on("disconnect", async () => {
       if (role === "Driver") {
         try {
