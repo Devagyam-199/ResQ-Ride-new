@@ -83,7 +83,6 @@ const useGeocoding = (userCoords = null) => {
     (query) => {
       clearTimeout(timer.current);
       if (!query || query.trim().length < 3) { setResults([]); return; }
-      // Don't search without location — would return pan-India noise
       if (!userCoords) { setResults([]); return; }
 
       timer.current = setTimeout(async () => {
